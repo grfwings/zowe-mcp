@@ -19,17 +19,23 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { createRequire } from 'node:module';
 import { getOrCreateTenantResponseCache, tenantKeyFromSub } from './auth/tenant-resources.js';
+import {
+  buildCapabilityInstructions,
+  type CapabilityTier,
+  installServerMiddleware,
+  resolveCapabilityTier,
+} from './capability-level.js';
 import type {
   OpenDatasetInEditorEventData,
   OpenJobInEditorEventData,
   OpenUssFileInEditorEventData,
 } from './events.js';
 import { Logger } from './log.js';
+import { getMcpDeploymentMode } from './mcp-deployment-mode.js';
 import { installMcpServerInvocationContext } from './mcp-tool-context.js';
 import { registerDatasetPrompts } from './prompts/dataset-prompts.js';
 import { registerImprovementPrompts } from './prompts/improvement-prompts.js';
 import { registerDatasetResources } from './resources/dataset-resources.js';
-import { installToolCallLogging } from './tool-call-logging.js';
 import { registerContextTools } from './tools/context/context-tools.js';
 import { registerDatasetTools } from './tools/datasets/dataset-tools.js';
 import { registerJobTools } from './tools/jobs/jobs-tools.js';
@@ -146,6 +152,11 @@ function getRelevantEnv(): Record<string, string> {
 
 /** Options for creating the MCP server. */
 export interface CreateServerOptions {
+  /**
+   * Capability tier controlling which tools are registered and how MCP hints are set.
+   * When omitted, resolved from ZOWE_MCP_CAPABILITY_TIER env var, defaulting to 'read-strict'.
+   */
+  capabilityTier?: CapabilityTier;
   /** z/OS backend implementation (mock or real). */
   backend?: ZosBackend;
   /** System registry with known z/OS systems. */
@@ -224,6 +235,11 @@ export interface CreateServerOptions {
    * After a successful elicitation, persist the card (e.g. tenant file or `--config` JSON).
    */
   persistJobCard?: (connectionSpec: string, jobCard: string) => void;
+  /**
+   * When provided, populated during tool registration with each tool's resource effect level.
+   * Used by doc generation to produce the capability tiers section.
+   */
+  toolEffectLevels?: Map<string, import('./capability-level.js').EffectLevel>;
 }
 
 /** Callbacks required to register Zowe Explorer open-in-editor tools (e.g. for late registration). */
@@ -284,6 +300,11 @@ export function createServer(options?: CreateServerOptions): CreateServerResult 
     mockMode: !!options?.backend,
   });
 
+  const capabilityTier = resolveCapabilityTier({
+    option: options?.capabilityTier,
+    env: process.env.ZOWE_MCP_CAPABILITY_TIER,
+  });
+
   const server: McpServer = new McpServer(
     {
       name: 'zowe-mcp-server',
@@ -293,7 +314,10 @@ export function createServer(options?: CreateServerOptions): CreateServerResult 
       capabilities: {
         logging: {},
       },
-      instructions: SERVER_INSTRUCTIONS,
+      instructions:
+        SERVER_INSTRUCTIONS +
+        '\n\n' +
+        buildCapabilityInstructions(capabilityTier, getMcpDeploymentMode()),
     }
   );
 
@@ -345,9 +369,12 @@ export function createServer(options?: CreateServerOptions): CreateServerResult 
   let sessionStateForZe: SessionState | undefined;
   let backendKindForZe: string | null = null;
 
-  if (logToolCalls) {
-    installToolCallLogging(server, logger, backendKind);
-  }
+  installServerMiddleware(server, logger, {
+    tier: capabilityTier,
+    logToolCalls,
+    backendKind,
+    effectLevelMap: options?.toolEffectLevels,
+  });
 
   // Register improvement prompts (for repos that use Zowe MCP) — always available
   registerImprovementPrompts(server, logger);
@@ -402,6 +429,7 @@ export function createServer(options?: CreateServerOptions): CreateServerResult 
         jobCardStore,
         onActiveConnectionChanged: options.onActiveConnectionChanged,
         encodingOptions,
+        capabilityTier,
         addTenantNativeConnection: options.addTenantNativeConnection,
         removeTenantNativeConnection: options.removeTenantNativeConnection,
       },
@@ -523,6 +551,7 @@ export function createServer(options?: CreateServerOptions): CreateServerResult 
       {
         serverVersion: SERVER_VERSION,
         backendKind: null,
+        capabilityTier,
       },
       logger
     );
