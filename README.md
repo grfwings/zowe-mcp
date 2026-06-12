@@ -77,8 +77,8 @@ You will reference this absolute path when configuring your editor.
 The native backend implements the full set of z/OS operations: data set
 CRUD (list, read, write, create, delete, copy, rename, restore, search,
 attributes), USS file operations (list, read, write, create, delete, chmod,
-chown, chtag, copy), TSO and console commands, and job management (submit,
-status, list, output, cancel, hold, release, delete).
+chown, chtag, copy), TSO commands, and job management (submit, status, list,
+output, cancel, hold, release, delete).
 
 Connection format is `user@hostname` or `user@hostname:port` (default port 22),
 same as SSH. Systems come from a config file or CLI:
@@ -198,7 +198,7 @@ local, uncommitted config file:
 </details>
 
 After reloading your editor, you can confirm the setup by asking the
-assistant to use the `info` tool to show the Zowe MCP server version.
+assistant to use the `getContext` tool to show the Zowe MCP server version.
 
 ## Safety and security
 
@@ -351,7 +351,7 @@ in the logs when the same password is used.
 ### Mock mode in the extension
 
 By default the extension starts the server without a z/OS backend, so only
-the `info` tool is available. A warning notification will appear with buttons
+the `getContext` tool is available. A warning notification will appear with buttons
 to help you configure mock data.
 
 Use the built-in command (easiest):

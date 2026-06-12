@@ -258,4 +258,4 @@ remediation.
 | Project architecture and patterns | [AGENTS.md](AGENTS.md) |
 | MCP tools reference | [docs/mcp-reference.md](docs/mcp-reference.md) |
 | Eval scoreboard | [docs/eval-scoreboard.md](docs/eval-scoreboard.md) |
-| Development guide | [DEVELOPING.md](DEVELOPING.md) |
+| Development guide | [DEVELOPMENT.md](DEVELOPMENT.md) |

@@ -73,7 +73,7 @@ tarball (Zowe Artifactory or in-repo fallback).
 | `npm run sdk:local -- <path>` | Local filesystem | A `.tgz` file or a Zowe Remote SSH SDK (`zowex`) repo directory |
 
 After switching, rebuild (`npm run build`) and run tests (`npm test`) to
-verify compatibility. The SDK tarball is stored in `deps/` (gitignored).
+verify compatibility. The SDK tarball is stored in `resources/`.
 
 Requires [GitHub CLI](https://cli.github.com/) (`gh`) for the `pr`, `branch`,
 and `nightly` (fallback) modes.
@@ -176,9 +176,8 @@ use `npm run pack:server` to build and pack from your clone).
 The packed tarball **bundles all dependencies** (including workspace package
 `zowe-mcp-common` and file-based `zowex-sdk`) so it can be installed
 standalone without requiring the monorepo or external file dependencies. The
-`prepack` script automatically bundles these dependencies before packing, and
-`bundledDependencies` in `package.json` ensures npm includes them in the
-tarball.
+`prepack` script automatically bundles these dependencies before packing and
+adds `bundledDependencies` dynamically so npm includes them in the tarball.
 
 ### Airgapped installation tests
 
