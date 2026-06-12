@@ -113,7 +113,7 @@ Use the script that matches how you want to run the server:
 
 | Script | Backend | Use when |
 | --- | --- | --- |
-| `npm run inspector` | None | Quick check: only core tools (e.g. `info`) are available; no z/OS systems. |
+| `npm run inspector` | None | Quick check: only core tools (e.g. `getContext`) are available; no z/OS systems. |
 | `npm run inspector:mock` | Mock (filesystem) | Try dataset tools without a real z/OS: uses `./zowe-mcp-mock-data`. Generate mock data first (see [Mock mode](README.md#mock-mode)). |
 | `npm run inspector:native` | Native (SSH) | Connect to real z/OS via SSH. Needs `native-config.json` (systems) and `.env` (passwords). Copy `native-config.example.json` → `native-config.json` and `.env.example` → `.env`, then set `ZOWE_MCP_PASSWORD_<USER>_<HOST>` (see [Connect to z/OS](README.md#connect-to-zos-native-backend)). |
 
