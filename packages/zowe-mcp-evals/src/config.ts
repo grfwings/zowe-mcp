@@ -123,12 +123,15 @@ function lmStudioApiBase(baseUrl: string): string {
 async function isModelAlreadyLoaded(
   apiBase: string,
   model: string,
-  contextLength: number
+  contextLength: number,
+  apiKey?: string
 ): Promise<boolean> {
   const url = `${apiBase}/api/v1/models`;
   let resp: Response;
   try {
-    resp = await fetch(url);
+    resp = await fetch(url, {
+      headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined,
+    });
   } catch {
     return false;
   }
@@ -158,11 +161,12 @@ async function isModelAlreadyLoaded(
 export async function ensureLmStudioModel(
   baseUrl: string,
   model: string,
-  contextLength: number
+  contextLength: number,
+  apiKey?: string
 ): Promise<void> {
   const apiBase = lmStudioApiBase(baseUrl);
 
-  if (await isModelAlreadyLoaded(apiBase, model, contextLength)) {
+  if (await isModelAlreadyLoaded(apiBase, model, contextLength, apiKey)) {
     process.stderr.write(
       `LM Studio: model "${model}" already loaded (context_length>=${contextLength.toString()}), skipping load\n`
     );
@@ -172,9 +176,11 @@ export async function ensureLmStudioModel(
   const url = `${apiBase}/api/v1/models/load`;
   let resp: Response;
   try {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
     resp = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({
         model,
         context_length: contextLength,
@@ -207,12 +213,14 @@ export async function ensureLmStudioModel(
  */
 export async function fetchAvailableModelIds(
   baseUrl: string,
-  options?: { textLlmOnly?: boolean }
+  options?: { textLlmOnly?: boolean; apiKey?: string }
 ): Promise<string[]> {
   const url = baseUrl.replace(/\/+$/, '') + '/models';
   let resp: Response;
   try {
-    resp = await fetch(url);
+    resp = await fetch(url, {
+      headers: options?.apiKey ? { Authorization: `Bearer ${options.apiKey}` } : undefined,
+    });
   } catch {
     throw new Error(
       `Could not reach OpenAI-compat server at ${baseUrl}. Is it running?\n` +
@@ -389,25 +397,25 @@ export function parseEvalsConfigRaw(raw: Record<string, unknown>): EvalsModelEnt
   ];
 }
 
+/** Find and read the evals config file; throws with a clear message if not found. */
+function readConfigFileContent(): string {
+  const configDir = findConfigDir();
+  for (const name of CONFIG_NAMES) {
+    const p = resolve(configDir, name);
+    if (existsSync(p)) {
+      return readFileSync(p, 'utf-8');
+    }
+  }
+  throw new Error(
+    `Evals config not found. Create evals.config.json (or evals.config.local.json) in the repo root or in packages/zowe-mcp-evals. See evals.config.example.json.`
+  );
+}
+
 /**
  * Read evals.config.json (or evals.config.local.json) and return all model entries without resolving a default.
  */
 export function loadEvalsModelEntries(): EvalsModelEntry[] {
-  const configDir = findConfigDir();
-  let content: string | undefined;
-  for (const name of CONFIG_NAMES) {
-    const p = resolve(configDir, name);
-    if (existsSync(p)) {
-      content = readFileSync(p, 'utf-8');
-      break;
-    }
-  }
-  if (!content) {
-    throw new Error(
-      `Evals config not found. Create evals.config.json (or evals.config.local.json) in the repo root. See evals.config.example.json.`
-    );
-  }
-  return parseEvalsConfigRaw(JSON.parse(content) as Record<string, unknown>);
+  return parseEvalsConfigRaw(JSON.parse(readConfigFileContent()) as Record<string, unknown>);
 }
 
 /**
@@ -420,21 +428,7 @@ export function loadEvalsModelEntries(): EvalsModelEntry[] {
  * @param modelId - Optional model id (from --model). If omitted, the first model is used.
  */
 export async function loadEvalsConfig(modelId?: string): Promise<EvalsConfig> {
-  const configDir = findConfigDir();
-  let content: string | undefined;
-  for (const name of CONFIG_NAMES) {
-    const p = resolve(configDir, name);
-    if (existsSync(p)) {
-      content = readFileSync(p, 'utf-8');
-      break;
-    }
-  }
-  if (!content) {
-    throw new Error(
-      `Evals config not found. Create evals.config.json (or evals.config.local.json) in the repo root or in packages/zowe-mcp-evals. See evals.config.example.json.`
-    );
-  }
-  const raw = JSON.parse(content) as Record<string, unknown>;
+  const raw = JSON.parse(readConfigFileContent()) as Record<string, unknown>;
   const entries = parseEvalsConfigRaw(raw);
 
   const chosen = modelId !== undefined ? entries.find(e => e.id === modelId) : entries[0];
@@ -448,7 +442,7 @@ export async function loadEvalsConfig(modelId?: string): Promise<EvalsConfig> {
     const contextLength = chosen.contextLength ?? LMSTUDIO_DEFAULT_CONTEXT_LENGTH;
 
     if (!chosen.serverModel?.trim()) {
-      const availableModels = await fetchAvailableModelIds(baseUrl);
+      const availableModels = await fetchAvailableModelIds(baseUrl, { apiKey: chosen.apiKey });
       const modelList =
         availableModels.length > 0
           ? `Available models:\n${availableModels.map(id => `  - ${id}`).join('\n')}`
@@ -458,7 +452,7 @@ export async function loadEvalsConfig(modelId?: string): Promise<EvalsConfig> {
       );
     }
 
-    await ensureLmStudioModel(baseUrl, chosen.serverModel, contextLength);
+    await ensureLmStudioModel(baseUrl, chosen.serverModel, contextLength, chosen.apiKey);
   }
 
   return entryToConfig(chosen);

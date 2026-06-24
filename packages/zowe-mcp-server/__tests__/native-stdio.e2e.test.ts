@@ -230,7 +230,15 @@ describe.skipIf(!shouldRunNativeStdioE2E)(
     beforeAll(async () => {
       const transport = new StdioClientTransport({
         command: 'node',
-        args: [serverPath, '--stdio', '--native', '--config', configPath!],
+        args: [
+          serverPath,
+          '--stdio',
+          '--native',
+          '--config',
+          configPath!,
+          '--capability-tier',
+          'full',
+        ],
         env: getChildEnv(),
       });
       client = new Client({ name: 'e2e-native-test', version: '1.0.0' });
@@ -698,7 +706,7 @@ describe.skipIf(!shouldRunNativeStdioE2E)(
         if ('error' in readParsed && readParsed.error) {
           throw new Error(`readUssFile failed for path ${filePath}: ${readParsed.error}`);
         }
-        const o = readParsed as {
+        const o = readParsed as unknown as {
           _context: { system: string };
           _result: {
             totalLines: number;

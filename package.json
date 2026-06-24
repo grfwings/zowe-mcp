@@ -1,6 +1,6 @@
 {
   "name": "zowe-mcp",
-  "version": "0.9.0-dev",
+  "version": "0.10.0-dev",
   "private": true,
   "description": "Zowe MCP - Model Context Protocol server and VS Code extension for z/OS",
   "workspaces": [
@@ -19,13 +19,18 @@
     "smoke:gemini-zowe-mcp": "npm run build -w @zowe/mcp-server && npm run build -w packages/zowe-mcp-evals && npm run smoke:gemini-zowe-mcp -w packages/zowe-mcp-evals",
     "format": "prettier --write \"**/*.{ts,mts,js,mjs,cjs,json,jsonc,yaml,yml,css,html}\" && node scripts/shfmt-write.mjs",
     "generate-cli-bridge-yaml": "node scripts/generate-cli-bridge-yaml.mjs",
+    "zosmf:download-specs": "node scripts/download-zosmf-specs.mjs",
+    "zosmf:download-specs-batch": "node scripts/download-zosmf-specs-batch.mjs",
     "generate-docs": "npm run build -w packages/zowe-mcp-common && npm run build -w @zowe/mcp-server && node packages/zowe-mcp-server/dist/index.js generate-docs",
     "inspector:mock": "npx @modelcontextprotocol/inspector node packages/zowe-mcp-server/dist/index.js --stdio --mock ./zowe-mcp-mock-data",
     "inspector:native": "dotenv -e .env -- npx @modelcontextprotocol/inspector node packages/zowe-mcp-server/dist/index.js -- --stdio --native --config native-config.json",
     "inspector": "npx @modelcontextprotocol/inspector node packages/zowe-mcp-server/dist/index.js --stdio",
     "lint:fix": "eslint --fix \"packages/**/*.ts\" --max-warnings 0",
-    "lint": "eslint \"packages/**/*.ts\" --max-warnings 0",
-    "markdownlint": "markdownlint-cli2 --fix",
+    "lint": "eslint \"packages/**/*.ts\" --max-warnings 0 --cache",
+    "lint:sarif": "eslint \"packages/**/*.ts\" -f @microsoft/eslint-formatter-sarif -o eslint-results.sarif --cache",
+    "typecheck": "npm run build -w packages/zowe-mcp-common && npm run build -w @zowe/mcp-server && npm run typecheck --workspaces --if-present",
+    "lint:md": "markdownlint-cli2",
+    "markdownlint:fix": "markdownlint-cli2 --fix",
     "test:all": "npm run test --workspaces",
     "test:server": "npm run test -w @zowe/mcp-server",
     "test:native-stdio-e2e": "npm run test:native-stdio-e2e -w @zowe/mcp-server",
@@ -52,6 +57,7 @@
     "local-registry:wipe-publish-dev": "bash scripts/local-registry-wipe-publish-dev.sh"
   },
   "devDependencies": {
+    "@microsoft/eslint-formatter-sarif": "^3.1.0",
     "@vitest/eslint-plugin": "^1.6.7",
     "@wasm-fmt/shfmt": "^0.2.7",
     "cloc": "^2.6.0",

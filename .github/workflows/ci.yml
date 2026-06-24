@@ -21,28 +21,179 @@ on:
         required: false
         type: string
 
+# Least privilege: the sticky PR comment needs pull-requests write, the JUnit
+# test reporter needs checks write, and the ESLint SARIF upload needs
+# security-events write; everything else reads.
 permissions:
+  contents: read
   pull-requests: write
+  checks: write
+  security-events: write
+
+# Cancel superseded runs on the same ref (e.g. rapid pushes to a PR branch).
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Workflow-level so every job shares one heap setting (build / type-check /
+# vitest / VSIX bundling can exceed Node's default). Bump in one place here.
+env:
+  NODE_OPTIONS: --max_old_space_size=4096
 
 jobs:
-  build:
+  # Detect whether this change touches anything other than Markdown docs. When a
+  # push/PR changes only *.md files, the heavy lanes (lint, build, cross-platform)
+  # are skipped — `ci-ok` still reports success (a skipped job counts as a pass),
+  # so required-check branch protection is satisfied without spending ~5 min of CI
+  # on a docs typo. Anything that is not purely Markdown runs the full pipeline.
+  changes:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     if: "!contains(github.event.head_commit.message || '', '[ci skip]')"
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - id: filter
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.base_ref }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -uo pipefail
+          range=""
+          if [ "$EVENT" = "pull_request" ]; then
+            git fetch --no-tags --depth=1 origin "$BASE" >/dev/null 2>&1 || true
+            range="origin/$BASE...HEAD"
+          elif [ -n "${BEFORE:-}" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ] \
+            && git rev-parse --verify --quiet "$BEFORE^{commit}" >/dev/null 2>&1; then
+            range="$BEFORE...HEAD"
+          fi
+          if [ -z "$range" ]; then
+            echo "No diff range (new branch / manual dispatch) — running all lanes."
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed=$(git diff --name-only "$range" 2>/dev/null) || changed=""
+          echo "Changed files in $range:"
+          echo "$changed"
+          # An empty or failed diff runs the full pipeline (the safe default).
+          if [ -z "$changed" ]; then
+            echo "Empty diff — running all lanes."
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # 'code' is true when ANY changed file is not a Markdown file. Filter
+          # with `grep -v` and test for non-empty output rather than `grep -qv` —
+          # the -q exit code with -v is unreliable across BSD/GNU grep. Pure-.md
+          # changes (the only docs we ship) skip the heavy lanes.
+          nonmd=$(printf '%s\n' "$changed" | grep -vE '\.md$' || true)
+          if [ -n "$nonmd" ]; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Docs-only (Markdown) change — heavy lanes will be skipped."
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
 
-    env:
-      NODE_OPTIONS: --max_old_space_size=4096
+  # Fast static checks (markdown lint, formatting, duplication, type-check, ESLint
+  # + SARIF). Split out of `build` so lint/type failures surface in ~1.5 min
+  # instead of waiting on the full test + package lane.
+  lint:
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version-file: '.nvmrc'
+          cache: npm
 
-      - name: Download zowex-sdk (Zowe Remote SSH)
+      - name: Install dependencies (npm ci)
+        run: npm ci --ignore-scripts
+
+      # Needed so the VS Code extension package type-checks against @types/vscode.
+      - name: Download VS Code API types
+        run: npm run download-api -w packages/zowe-mcp-vscode
+
+      - name: Lint Markdown
+        run: npm run lint:md
+
+      - name: Check formatting (Prettier + shfmt)
+        run: npm run check-format
+
+      - name: Check code duplication (jscpd)
+        run: npm run duplication
+
+      - name: Build (common + server)
+        run: |
+          npm run build -w packages/zowe-mcp-common
+          npm run build -w @zowe/mcp-server
+
+      # Type-check every package including its tests (dev tsconfig, --noEmit).
+      # common + server are already built above, so run the workspace scripts
+      # directly rather than the root script (which would rebuild them).
+      - name: Type-check (incl. tests)
+        run: npm run typecheck --workspaces --if-present
+
+      - run: npm run lint
+
+      # Emit an ESLint SARIF report and upload it to code scanning, so lint
+      # findings appear in the Security tab and as inline PR annotations. Reuses
+      # the eslint cache the gate above just populated (--cache), so this second
+      # pass is near-instant. Visibility-only: never fails the job, and runs even
+      # if the gate failed (!cancelled) so the annotations show up when needed.
+      - name: ESLint SARIF report
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: npm run lint:sarif
+      - name: Upload ESLint SARIF
+        # security-events:write is unavailable to fork-PR tokens — skip there.
+        if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: eslint-results.sarif
+          category: eslint
+
+  # Heavy lane: build, server tests + coverage, VS Code extension tests, pack,
+  # airgap, docs, VSIX, and artifact uploads. Runs on Linux; the static checks
+  # live in `lint` and the OS coverage in `cross-platform`.
+  build:
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+
+      # Default path (push / PR / dispatch with fallback): install strictly from
+      # the committed lockfile, which already pins the fallback zowex-sdk. Use
+      # --ignore-scripts because the prebuilt zowex-sdk tarball ships no build
+      # step and other deps' install scripts are not needed here (VS Code API
+      # types are fetched explicitly below).
+      - name: Install dependencies (npm ci)
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.sdk-mode != 'fallback') }}
+        run: npm ci --ignore-scripts
+
+      # Custom SDK source (manual dispatch only): sdk-switch rewrites the server
+      # dependency to the chosen tarball and runs its own install, so npm ci is
+      # skipped on this path.
+      - name: Switch zowex-sdk and install (custom SDK mode)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.sdk-mode != 'fallback' }}
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/sdk-switch.js ${{ inputs.sdk-mode || 'fallback' }} ${{ inputs.sdk-arg }}
+        run: node scripts/sdk-switch.js ${{ inputs.sdk-mode }} ${{ inputs.sdk-arg }}
 
       - name: Environment info
         run: |
@@ -60,15 +211,67 @@ jobs:
           npm run build -w packages/zowe-mcp-common
           npm run build -w @zowe/mcp-server
 
-      - run: npm run lint
+      # Server tests with coverage (report-only — no threshold gate) and a
+      # JUnit file for the PR checks UI. e2e suites self-skip without their
+      # env gates (ZOWE_MCP_KEYCLOAK_E2E, ZOWE_MCP_RUN_NATIVE_STDIO_E2E, ...).
+      - name: Test (server, coverage + JUnit)
+        run: >
+          npm run test -w @zowe/mcp-server --
+          --coverage --coverage.reporter=text-summary
+          --coverage.reporter=html --coverage.reporter=json-summary
+          --reporter=default --reporter=junit
+          --outputFile.junit=test-results.junit.xml
 
-      - run: npm run test
+      - name: Publish test results
+        uses: dorny/test-reporter@v2
+        # Needs checks:write — skip for fork PRs (their token is read-only).
+        if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        with:
+          name: Server test results
+          path: packages/zowe-mcp-server/test-results.junit.xml
+          reporter: java-junit
+
+      # Surface coverage on the run Summary page (next to the test report)
+      # so nobody has to dig through the step log.
+      - name: Coverage summary
+        run: |
+          node -e "
+          const t = require('./packages/zowe-mcp-server/coverage/coverage-summary.json').total;
+          const row = k => \`| \${k[0].toUpperCase()+k.slice(1)} | \${t[k].pct}% | \${t[k].covered}/\${t[k].total} |\`;
+          const lines = ['## Server coverage (report-only)', '', '| Metric | Coverage | Covered/Total |', '| --- | --- | --- |'];
+          for (const k of ['statements','branches','functions','lines']) lines.push(row(k));
+          require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join('\n') + '\n');
+          "
+
+      - name: Upload coverage report (HTML)
+        uses: actions/upload-artifact@v7
+        id: coverage-upload
+        with:
+          name: coverage-report
+          path: packages/zowe-mcp-server/coverage
+
+      # VS Code extension tests (@vscode/test-cli downloads VS Code; needs a
+      # display on Linux, hence xvfb-run). The download is cached.
+      - name: Cache VS Code test download
+        uses: actions/cache@v4
+        with:
+          path: packages/zowe-mcp-vscode/.vscode-test
+          key: vscode-test-${{ runner.os }}-${{ hashFiles('packages/zowe-mcp-vscode/package.json') }}
+
+      - name: Test (VS Code extension)
+        run: xvfb-run -a npm run test:vscode
 
       - name: Pack @zowe/mcp-server (npm tarball)
         run: npm pack -w @zowe/mcp-server --pack-destination .
 
+      # Airgapped-install test: installs the freshly packed tarball with an
+      # empty npm cache, an invalid registry, and a 5ms network timeout, then
+      # smoke-runs the binary — proves the tarball is fully self-contained.
+      - name: Test airgapped install (packed tarball)
+        run: npm run test:airgap
+
       - name: Upload npm package tarball
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         id: npm-pack-upload
         with:
           name: zowe-mcp-server-npm
@@ -78,18 +281,24 @@ jobs:
       - name: Generate MCP reference docs
         run: npm run generate-docs
 
+      # Docs-drift gate: the generator is deterministic (pinned mock clock, no
+      # commit hash in the header), so regenerating must not change the committed
+      # reference docs. If this fails, run `npm run generate-docs` and commit.
+      - name: Check MCP reference docs are up to date
+        run: git diff --exit-code docs/mcp-reference.md vendor/zowe/docs/mcp-reference-vendor.md
+
       - name: Build VS Code extension (VSIX)
         run: npm run package -w packages/zowe-mcp-vscode
 
       - name: Upload VSIX artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         id: vsix-upload
         with:
           name: vsix
           path: packages/zowe-mcp-vscode/*.vsix
 
       - name: Upload MCP reference docs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         id: docs-upload
         with:
           name: mcp-reference
@@ -97,7 +306,7 @@ jobs:
 
       - name: Comment on PR
         if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-        uses: marocchino/sticky-pull-request-comment@v2
+        uses: marocchino/sticky-pull-request-comment@v3
         with:
           header: Build artifacts
           number: ${{ github.event.pull_request.number }}
@@ -106,3 +315,87 @@ jobs:
              - VS Code Extension (VSIX): ${{ steps.vsix-upload.outputs.artifact-url }}
              - MCP server npm package (.tgz): ${{ steps.npm-pack-upload.outputs.artifact-url }}
              - MCP Reference Docs: ${{ steps.docs-upload.outputs.artifact-url }}
+             - Server coverage report (HTML): ${{ steps.coverage-upload.outputs.artifact-url }}
+
+  # Cross-platform verification on Windows and macOS. The full build job above
+  # runs on Linux (it owns the packaging/release/coverage steps); this leg runs
+  # only the portable parts — build, type-check, server tests, and the VS Code
+  # extension tests — to catch path-separator, line-ending, and case-sensitivity
+  # bugs the extension/CLI hit on users' machines. Ubuntu is already covered by
+  # `build`. fail-fast: false so one OS failing doesn't cancel the other.
+  cross-platform:
+    needs: changes
+    name: Cross-platform (${{ matrix.os }})
+    if: ${{ needs.changes.outputs.code == 'true' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+
+      - name: Install dependencies (npm ci)
+        run: npm ci --ignore-scripts
+
+      - name: Download VS Code API types
+        run: npm run download-api -w packages/zowe-mcp-vscode
+
+      - name: Build (common + server)
+        run: |
+          npm run build -w packages/zowe-mcp-common
+          npm run build -w @zowe/mcp-server
+
+      - name: Type-check (incl. tests)
+        run: npm run typecheck --workspaces --if-present
+
+      # --no-file-parallelism avoids the cross-platform integration-test
+      # contention documented in AGENTS.md (observed hanging on macOS).
+      - name: Test (server)
+        run: npm run test -w @zowe/mcp-server -- --no-file-parallelism
+
+      # Cache the VS Code download here too (keyed per-OS) so Windows/macOS don't
+      # re-fetch the editor every run — it was previously cached only on Linux.
+      - name: Cache VS Code test download
+        uses: actions/cache@v4
+        with:
+          path: packages/zowe-mcp-vscode/.vscode-test
+          key: vscode-test-${{ runner.os }}-${{ hashFiles('packages/zowe-mcp-vscode/package.json') }}
+
+      # No xvfb here: @vscode/test-electron runs headless natively on
+      # Windows/macOS runners (xvfb is Linux-only).
+      - name: Test (VS Code extension)
+        run: npm run test:vscode
+
+  # Aggregate gate: one stable check name for branch protection to require, so
+  # adding, renaming, or sharding the CI jobs above never churns the protection
+  # config (only a brand-new *workflow* would). Runs even when an upstream job
+  # failed or was skipped (if: always()) and fails only if a needed job actually
+  # failed or was cancelled. Skipped jobs count as a pass — so a `[ci skip]` push
+  # (changes guarded off) or a docs-only change (heavy lanes skipped) still
+  # satisfies the required check.
+  ci-ok:
+    name: ci-ok
+    needs: [changes, lint, build, cross-platform]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify required CI jobs succeeded
+        run: |
+          echo "changes        = ${{ needs.changes.result }} (code=${{ needs.changes.outputs.code }})"
+          echo "lint           = ${{ needs.lint.result }}"
+          echo "build          = ${{ needs.build.result }}"
+          echo "cross-platform = ${{ needs.cross-platform.result }}"
+          if [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = "true" ]; then
+            echo "::error::A required CI job failed or was cancelled."
+            exit 1
+          fi
+          echo "All required CI jobs passed (or were skipped)."

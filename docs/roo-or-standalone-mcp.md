@@ -2,6 +2,8 @@
 
 Some AI clients (for example [Roo Code](https://docs.roocode.com/features/mcp/using-mcp-in-roo)) load MCP servers only from **their own** configuration (e.g. project `.roo/mcp.json` or global `mcp_settings.json` with an `mcpServers` object). They do **not** use VS Code’s `vscode.lm.registerMcpServerDefinitionProvider`, so the Zowe MCP VS Code extension does not register the server for them.
 
+> **If you have the Zowe MCP VS Code extension installed for Roo:** uninstall it and use the `@zowe/mcp-server` npm package directly via Roo's `mcp.json` (this guide). The extension's MCP-server registration is invisible to Roo, so leaving it installed just adds a stale Settings UI and a misleading log channel. Uninstall via the Extensions view, or `code --uninstall-extension zowe.zowe-mcp-vscode`. The extension's helper commands (`zowe-mcp.initMockData`, etc.) are thin wrappers around CLI subcommands — `zowe-mcp-server init-mock --output …` is equivalent.
+
 Use the `**@zowe/mcp-server`** npm package in **stdio** mode: `command` + `args` (+ optional `env`), the same as any MCP client that spawns a process.
 
 For **Streamable HTTP** (Bearer JWT, local Keycloak, or any remote URL), Roo supports **`type`: `streamable-http`** with **`url`** and optional **`headers`** — see **`docs/remote-dev-keycloak.md`** (Copilot / Cursor / Roo examples).
@@ -16,9 +18,9 @@ For **Streamable HTTP** (Bearer JWT, local Keycloak, or any remote URL), Roo sup
 
 ## Install the server
 
-1. **Ephemeral** — `npx -y @zowe/mcp-server` (pin a version in production).
-2. **Project-local** — `npm install @zowe/mcp-server` → `node_modules/.bin/zowe-mcp-server`.
-3. **Global** — `npm install -g @zowe/mcp-server` → run `zowe-mcp-server` (on `PATH`).
+1. **Ephemeral** — `npx -y @zowe/mcp-server` (pin a version in production). **Requires the package to be published to npm or mirrored in a registry your `npm` can resolve `@zowe/*` from — not the case while `@zowe/mcp-server` is unpublished. Until then, use the tarball-npx form in [Obtaining the `.tgz`](#obtaining-the-tgz).**
+2. **Project-local** — `npm install @zowe/mcp-server` → `node_modules/.bin/zowe-mcp-server`. Same publication requirement as above; otherwise install from the `.tgz`.
+3. **Global** — `npm install -g @zowe/mcp-server` → run `zowe-mcp-server` (on `PATH`). Same publication requirement as above; otherwise install the `.tgz` globally (`npm install -g ./zowe-mcp-server-<version>.tgz`).
 
 Ensure your npm registry can resolve `@zowe/*` (public npm or your org’s mirror; see root `.npmrc` if applicable).
 

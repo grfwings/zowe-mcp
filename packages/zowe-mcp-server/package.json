@@ -1,6 +1,6 @@
 {
   "name": "@zowe/mcp-server",
-  "version": "0.9.0-dev",
+  "version": "0.10.0-dev",
   "description": "Zowe MCP Server - Model Context Protocol server providing tools for z/OS",
   "type": "module",
   "main": "dist/index.js",
@@ -16,6 +16,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json && node scripts/copy-resources.cjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "dev": "tsc -p tsconfig.build.json --watch",
     "pretest": "npm run build",
     "test": "vitest run",
@@ -49,6 +50,7 @@
     "lru-cache": "^11.2.6",
     "node-ssh": "^13.2.0",
     "path-to-regexp": "8.4.0",
+    "ssh2": "^1.17.0",
     "yargs": "^17.7.2",
     "zod": "^4.3.6",
     "zowe-mcp-common": "*",
@@ -59,7 +61,8 @@
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.0.0",
     "@types/ssh2": "^1.15.5",
-    "ssh2": "^1.17.0",
+    "@vitest/coverage-v8": "4.1.0",
+    "ajv": "^8.17.1",
     "vitest": "^4.0.18"
   }
 }
