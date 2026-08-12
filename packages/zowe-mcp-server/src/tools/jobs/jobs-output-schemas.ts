@@ -127,19 +127,17 @@ const readJobFileDataSchema = z.object({
   mimeType: z.string().describe('Content type (e.g. text/plain, text/x-jcl).'),
 });
 
-const getJobOutputFileEntrySchema = z.object({
-  jobFileId: z.number().describe('Job file (spool) ID.'),
-  ddname: z.string().optional().describe('DD name.'),
-  stepname: z.string().optional().describe('Step name.'),
-  lines: z.array(z.string()).describe('Full content of this job file as array of lines.'),
-  lineCount: z.number().describe('Number of lines.'),
+const getJobOutputFileMetadataSchema = jobFileEntrySchema.extend({
+  jobFileId: z.number().describe('Compatibility alias for id; pass this to readJobFile.'),
 });
 
 const getJobOutputDataSchema = z.object({
   jobId: z.string().describe('Job ID.'),
   status: z.string().describe('Job status (e.g. OUTPUT).'),
   retcode: z.string().optional().describe('Job return code when complete (e.g. CC 0000).'),
-  files: z.array(getJobOutputFileEntrySchema).describe('Output from job files in this page.'),
+  files: z
+    .array(getJobOutputFileMetadataSchema)
+    .describe('Spool-file metadata only; use readJobFile or downloadJobFileToFile for content.'),
 });
 
 const searchJobOutputMatchSchema = z.object({
@@ -209,7 +207,7 @@ export const readJobFileOutputSchema = envelopeSchema(
 export const getJobOutputOutputSchema = envelopeSchema(
   getJobOutputDataSchema,
   listResultMetaSchema,
-  'Aggregated output from job files. data has jobId, status, retcode, files[]; _result has pagination.'
+  'Deprecated compatibility response. data has jobId, status, retcode, and files[] metadata only; use readJobFile or downloadJobFileToFile for content.'
 );
 
 export const searchJobOutputOutputSchema = envelopeSchema(
