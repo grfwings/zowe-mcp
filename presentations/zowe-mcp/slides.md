@@ -4,7 +4,7 @@ title: 'Zowe MCP: AI-Powered z/OS Access'
 info: |
   Zowe MCP — Model Context Protocol server and VS Code extension
   that gives AI assistants direct access to z/OS systems.
-  Last updated: April 2026
+  Last updated: August 2026
 class: text-center
 colorSchema: light
 drawings:
@@ -12,7 +12,7 @@ drawings:
 transition: slide-left
 mdc: true
 ---
-<!-- Last reviewed: 2026-04 — End-of-deck slides: shared HTTP OAuth topology, MCP registries; docs/remote-http-mcp-registry.md. CLI Bridge: docs/how-to-add-cli-plugin.md -->
+<!-- Last reviewed: 2026-08 — End-of-deck slides: shared HTTP OAuth topology, MCP registries; docs/remote-http-mcp-registry.md. CLI Bridge: docs/how-to-add-cli-plugin.md -->
 
 <!-- Slide 1: Title -->
 
@@ -20,7 +20,7 @@ mdc: true
   <img src="/zowe-logo.svg" class="w-48 mb-6 drop-shadow-lg" alt="Zowe" />
   <h1 class="!text-5xl !font-extrabold !text-white !border-none !mb-4">Zowe MCP</h1>
   <p class="text-2xl !text-white/90 font-light">AI-Powered z/OS Access via Model Context Protocol</p>
-  <p class="text-sm !text-white/50 mt-6">Last updated: April 2026</p>
+  <p class="text-sm !text-white/50 mt-6">Last updated: August 2026</p>
 </div>
 
 <style>
@@ -76,15 +76,15 @@ An **MCP server** and **VS Code extension** that gives AI assistants direct, str
   <carbon-machine-learning class="inline text-[#3162ac]" /> <strong class="text-[#1b375f]">Built with AI:</strong> Not a single line of Zowe MCP was written manually — every line was coded with <strong>frontier AI models in VS Code</strong>, guided and reviewed by architects at Broadcom with experience building MCP servers and AI applications and strong mainframe background.
 </div>
 
-<div class="grid grid-cols-4 gap-4 mt-8">
+<div class="grid grid-cols-4 gap-4 mt-3">
   <div class="text-center p-4 bg-[#f3f4f4] rounded-lg border-t-4 border-[#3162ac]">
     <carbon-assembly-cluster class="text-2xl text-[#3162ac] mb-1" />
-    <div class="text-4xl font-extrabold text-[#3162ac]">7</div>
+    <div class="text-4xl font-extrabold text-[#3162ac]">9</div>
     <div class="text-sm text-[#6d7176] mt-1">Components</div>
   </div>
   <div class="text-center p-4 bg-[#f3f4f4] rounded-lg border-t-4 border-[#3162ac]">
     <carbon-tool-box class="text-2xl text-[#3162ac] mb-1" />
-    <div class="text-4xl font-extrabold text-[#3162ac]">59</div>
+    <div class="text-4xl font-extrabold text-[#3162ac]">75</div>
     <div class="text-sm text-[#6d7176] mt-1">Tools</div>
   </div>
   <div class="text-center p-4 bg-[#f3f4f4] rounded-lg border-t-4 border-[#3162ac]">
@@ -99,7 +99,7 @@ An **MCP server** and **VS Code extension** that gives AI assistants direct, str
   </div>
 </div>
 
-<div class="mt-8 grid grid-cols-3 gap-4 text-sm">
+<div class="mt-3 grid grid-cols-3 gap-4 text-sm">
   <div class="p-3 bg-[#f3f4f4] rounded-lg border-l-4 border-[#16825d]">
     <div class="font-bold text-[#1b375f] mb-1"><carbon-terminal class="inline text-[#16825d]" /> Standalone Server</div>
     <div class="text-[#6d7176]"><code>zowe-mcp-server --stdio</code> (npm package <code>@zowe/mcp-server</code>) — works with any MCP client</div>
@@ -110,7 +110,7 @@ An **MCP server** and **VS Code extension** that gives AI assistants direct, str
   </div>
   <div class="p-3 bg-[#f3f4f4] rounded-lg border-l-4 border-[#16825d]">
     <div class="font-bold text-[#1b375f] mb-1"><carbon-cloud class="inline text-[#16825d]" /> Remote HTTP Streamable</div>
-    <div class="text-[#6d7176]"><strong>Shared</strong> team server — HTTPS <code>/mcp</code>, optional Bearer JWT, MCP registry <code>remotes</code>. Covered at the <strong>end of this deck</strong>.</div>
+    <div class="text-[#6d7176]"><strong>Shared</strong> team server — HTTPS <code>/mcp</code>, Bearer JWT, registry <code>remotes</code> — see end of deck.</div>
   </div>
 </div>
 
@@ -211,7 +211,7 @@ flowchart TD
 
   subgraph Server ["Zowe MCP Server"]
     direction LR
-    Tools["59 Tools divided into 7&nbsp;Components"]
+    Tools["75 Tools divided into 9&nbsp;Components"]
     Cache["Response Cache"]
     Tools --> ZosBackendInterface
     ZosBackendInterface["ZosBackend Interface"]
@@ -235,7 +235,7 @@ flowchart TD
 
 <div class="grid grid-cols-4 gap-3 mt-4">
   <div class="col-span-4 text-center p-3 bg-[#1b375f] text-white rounded-lg font-bold text-lg">
-    Zowe MCP Server — 59 tools
+    Zowe MCP Server — 75 tools
   </div>
   <div class="p-3 bg-[#f3f4f4] rounded-lg border-t-3 border-[#3162ac] text-center">
     <carbon-data-base class="text-xl text-[#3162ac]" />
@@ -252,23 +252,29 @@ flowchart TD
   <div class="p-3 bg-[#f3f4f4] rounded-lg border-t-3 border-[#3162ac] text-center">
     <carbon-task class="text-xl text-[#3162ac]" />
     <div class="font-bold text-[#1b375f]">jobs</div>
-    <div class="text-2xl font-extrabold text-[#3162ac]">15</div>
+    <div class="text-2xl font-extrabold text-[#3162ac]">14</div>
     <div class="text-xs text-[#6d7176] mt-1">submit · status · output<br/>cancel · hold · release · delete</div>
   </div>
   <div class="p-3 bg-[#f3f4f4] rounded-lg border-t-3 border-[#3162ac] text-center">
     <carbon-settings class="text-xl text-[#3162ac]" />
-    <div class="font-bold text-[#1b375f]">context</div>
-    <div class="text-2xl font-extrabold text-[#3162ac]">3</div>
-    <div class="text-xs text-[#6d7176] mt-1">listSystems · setSystem<br/>getContext</div>
+    <div class="font-bold text-[#1b375f]">certificates</div>
+    <div class="text-2xl font-extrabold text-[#3162ac]">9</div>
+    <div class="text-xs text-[#6d7176] mt-1">show · connect · import · export<br/>trust · rename · default · refresh</div>
   </div>
 </div>
 
-<div class="grid grid-cols-3 gap-3 mt-3">
+<div class="grid grid-cols-5 gap-3 mt-3">
   <div class="p-3 bg-[#f3f4f4] rounded-lg border-t-3 border-[#3975d0] text-center">
-    <carbon-application class="text-xl text-[#3975d0]" />
-    <div class="font-bold text-[#1b375f]">zowe-explorer</div>
-    <div class="text-xl font-extrabold text-[#3975d0]">3</div>
-    <div class="text-xs text-[#6d7176]">open dataset · USS file · job in editor</div>
+    <carbon-bare-metal-server class="text-xl text-[#3975d0]" />
+    <div class="font-bold text-[#1b375f]">system</div>
+    <div class="text-xl font-extrabold text-[#3975d0]">4</div>
+    <div class="text-xs text-[#6d7176]">APF · linklist · proclib · syslog</div>
+  </div>
+  <div class="p-3 bg-[#f3f4f4] rounded-lg border-t-3 border-[#3975d0] text-center">
+    <carbon-settings class="text-xl text-[#3975d0]" />
+    <div class="font-bold text-[#1b375f]">context</div>
+    <div class="text-xl font-extrabold text-[#3975d0]">4</div>
+    <div class="text-xs text-[#6d7176]">getContext · listSystems<br/>setSystem · addZosConnection</div>
   </div>
   <div class="p-3 bg-[#f3f4f4] rounded-lg border-t-3 border-[#3975d0] text-center">
     <carbon-terminal class="text-xl text-[#3975d0]" />
@@ -281,6 +287,12 @@ flowchart TD
     <div class="font-bold text-[#1b375f]">local-files</div>
     <div class="text-xl font-extrabold text-[#3975d0]">5</div>
     <div class="text-xs text-[#6d7176]">download · upload · dataset · USS · job</div>
+  </div>
+  <div class="p-3 bg-[#f3f4f4] rounded-lg border-t-3 border-[#3975d0] text-center">
+    <carbon-application class="text-xl text-[#3975d0]" />
+    <div class="font-bold text-[#1b375f]">zowe-explorer</div>
+    <div class="text-xl font-extrabold text-[#3975d0]">3</div>
+    <div class="text-xs text-[#6d7176]">open dataset · USS file · job in editor</div>
   </div>
 </div>
 
@@ -454,7 +466,7 @@ An **additional channel** alongside stdio for deeper VS Code integration
 
 <!-- Slide 13: Jobs -->
 
-# <carbon-task class="inline text-[#3162ac]" /> Job Operations — 15 Tools
+# <carbon-task class="inline text-[#3162ac]" /> Job Operations — 14 Tools
 
 <div class="grid grid-cols-2 gap-6">
 <div>
@@ -529,6 +541,42 @@ When a command needs approval, the server asks the MCP client to prompt the user
 
 ---
 
+<!-- Slide 14b: System & Certificate Tools (new in 0.10.0) -->
+
+# <carbon-security class="inline text-[#3162ac]" /> System & Certificate Tools <span class="text-sm font-normal text-[#16825d]">new in 0.10.0</span>
+
+<div class="grid grid-cols-2 gap-6">
+<div>
+
+### <carbon-bare-metal-server class="inline text-[#3162ac]" /> System Information — 4 Tools
+
+- **listApfLibraries** — APF-authorized data sets
+- **listLinklist** — link list data sets
+- **listProclib** — PROCLIB concatenation
+- **viewSyslog** — system log, line-windowed reads
+
+Read-only visibility an AI assistant needs to answer
+"is this library authorized?" or "what happened on the
+system at 14:02?" without operator access.
+
+</div>
+<div>
+
+### <carbon-certificate class="inline text-[#3162ac]" /> Certificates & Key Rings — 9 Tools
+
+- **showCertificate** / **exportCertificate** (PEM, PKCS#12)
+- **importCertificate** / **connectCertificate** / **deleteCertificate**
+- **trustCertificate** / **setDefaultCertificate** / **renameCertificate**
+- **refreshCertificateClass** — make DIGTCERT changes take effect
+
+Works against the z/OS security database — **RACF, ACF2, or
+Top Secret** — with SAF return codes surfaced on every action.
+
+</div>
+</div>
+
+---
+
 <!-- Slide 15: Multi-System Support -->
 
 # <carbon-network-3 class="inline text-[#3162ac]" /> Multi-System Support
@@ -560,7 +608,7 @@ When a command needs approval, the server asks the MCP client to prompt the user
 ### <carbon-settings class="inline text-[#3162ac]" /> Configuration
 
 - **VS Code** — `zoweMCP.zowexConnections` setting
-- **Standalone** — `--config systems.json` or `--system user@host`
+- **Standalone** — `--config systems.json` or `--system`
 - **Mock** — `systems.json` in mock data directory
 
 </div>
@@ -682,20 +730,18 @@ When multiple tools request the same credential simultaneously, only one prompt 
 </div>
 <div>
 
+### <carbon-password class="inline text-[#16825d]" /> SSH Key Authentication <span class="text-xs font-normal text-[#16825d]">new in 0.10.0</span>
+
+- **Private keys preferred over passwords** — explicit key, `~/.ssh/config`, then default key locations
+- Automatic **fallback to the password flow** when no usable key is found
+- Encrypted keys: passphrase via env var (`ssh-agent` support planned)
+
 ### <carbon-security class="inline text-[#3162ac]" /> Security Features
 
 - Passwords **never stored in plain text** — VS Code SecretStorage (OS keychain)
 - **Invalid password blacklisting** — prevents repeated failed auth
 - **"Clear Stored Password"** command in VS Code palette
 - Shared secret key convention: `zowe.ssh.password.${user}.${host}`
-
-### Connection Types
-
-| Mode | Credential Source |
-|------|------------------|
-| VS Code | SecretStorage + pipe prompt |
-| Standalone | Environment variables |
-| Mock | `systems.json` credentials |
 
 </div>
 </div>
@@ -744,16 +790,21 @@ When multiple tools request the same credential simultaneously, only one prompt 
 ### <carbon-terminal class="inline text-[#3162ac]" /> Standalone Server
 
 ```bash
-# One-time install from the packed tarball
-# (`@zowe/mcp-server` is not yet on a public npm registry).
-npm install -g ./zowe-mcp-server-<version>.tgz
+# One-time install from the packed
+# tarball (not yet on a public
+# npm registry).
+npm install -g \
+  ./zowe-mcp-server-<version>.tgz
 
-zowe-mcp-server init-mock --output ./mock-data
-zowe-mcp-server --stdio --mock ./mock-data
+zowe-mcp-server init-mock \
+  --output ./mock-data
+zowe-mcp-server --stdio \
+  --mock ./mock-data
 ```
 
 ```bash
-zowe-mcp-server --stdio --zowex --system user@host
+zowe-mcp-server --stdio \
+  --zowex --system user@host
 ```
 
 </div>
@@ -762,7 +813,7 @@ zowe-mcp-server --stdio --zowex --system user@host
 ### <carbon-play class="inline text-[#3162ac]" /> Quick Tool Testing
 
 ```bash
-# From a clone of this repo (npm workspaces).
+# From a clone of this repo.
 npx @zowe/mcp-server call-tool \
   --mock=./mock-data \
   listDatasets \
@@ -795,15 +846,14 @@ Every tool change is validated with **before/after AI evaluation runs**.
 1. Define **question sets** in YAML — natural language questions with assertions
 2. Run evals across **multiple LLM models**
 3. Compare pass rates — keep improvements, revert regressions
-4. Track results in **scoreboard** (`docs/eval-scoreboard.md`)
+4. Track results in the **eval scoreboard**
 
-### <carbon-category class="inline text-[#3162ac]" /> Question Set Types
+### <carbon-category class="inline text-[#3162ac]" /> Question Sets — 147 questions
 
-- **naming-stress** — CLI phrasing, z/OS jargon, ISPF vocabulary
-- **description-quality** — pagination, search options, attributes
-- **sms-allocation** — SMS parameters, JCL-style allocation
-- **mutations** — write/delete flows
-- **pagination** / **search** — correctness of multi-page results
+- **naming-stress** — CLI phrasing, z/OS jargon
+- **description-quality** — pagination, attributes
+- **system** / **certificates** / **multi-turn** — new in 0.10.0
+- **mutations** · **sms-allocation** · **pagination** · **search**
 
 </div>
 <div>
@@ -824,7 +874,8 @@ Every tool change is validated with **before/after AI evaluation runs**.
 
 - **Parameter descriptions** matter more than parameter names for LLMs
 - **Expanding z/OS jargon** in descriptions improved pass rates by +9.1%
-- Pagination awareness remains a challenge
+- 16 models benchmarked — `qwen3.6-35b-a3b` scores **100%**; `gemini-2.5-flash` ~94%
+- **Claude Code smoke suite** drives the real `claude` CLI
 
 </div>
 </div>
@@ -1041,7 +1092,7 @@ Adapt an **existing** Zowe CLI plugin without new TypeScript: one **metadata pip
 | **Contains** | Every group, command, positional, option, alias, CLI description | `plugin`, `profiles`, `tools[]`, `zoweCommand`, pagination, error behavior |
 | **Used for** | `$.endevor.list.elements.description` style **JSON references** | Runtime: bridge builds `zowe … --rfj` and wraps JSON |
 
-<div class="mt-4 grid grid-cols-2 gap-4 text-sm">
+<div class="mt-2 grid grid-cols-2 gap-4 text-sm">
 <div class="p-3 bg-[#f3f4f4] rounded-lg border-l-4 border-[#3162ac]">
 
 <div class="font-bold text-[#1b375f] mb-1">Bridge vs Zowe Remote SSH (zowex)</div>
@@ -1055,7 +1106,7 @@ Adapt an **existing** Zowe CLI plugin without new TypeScript: one **metadata pip
 <div class="font-bold text-[#1b375f] mb-1">Profiles in tools YAML</div>
 
 - **Connection** — reach the service (host, port, protocol, …)
-- **Location** — domain context (e.g. env/stage or Db2 `database`); often `perToolOverride: true`
+- **Location** — domain context (env/stage, Db2 `database`)
 - Auto tools: `listConnections` / `setConnection`, `listLocations` / `setLocation`
 
 </div>
@@ -1114,7 +1165,7 @@ class: text-sm
 
 ::left::
 
-<div class="text-xs leading-snug pr-2 max-h-[62vh] overflow-y-auto">
+<div class="text-xs leading-snug pr-2 max-h-[80vh] overflow-y-auto">
 
 <p class="mb-2 text-[#6d7176]"><strong class="text-[#1b375f]">Streamable HTTP</strong> on <code>/mcp</code> — multi-session MCP over HTTPS.<br/>
 </p>
@@ -1132,8 +1183,8 @@ class: text-sm
 
 <ul class="list-disc pl-4 space-y-1 text-[#6d7176]">
 <li>Tenant data keyed by OIDC <code>sub</code>; not shared secrets alone.</li>
-<li>Mainframe SSH passwords stay separate — env, vault, or elicitation. The access token does not replace SAF or SSH credentials.</li>
-<li>TLS usually at a reverse proxy; set public base URL env vars so OAuth and password-elicit URLs match the browser.</li>
+<li>SSH passwords stay separate (env, vault, elicitation) — the token never replaces SAF/SSH credentials.</li>
+<li>TLS at the reverse proxy; set public base-URL env vars so OAuth URLs match the browser.</li>
 </ul>
 
 </div>
@@ -1212,8 +1263,7 @@ An <strong class="text-[#1b375f]">MCP registry</strong> is a <strong class="text
 
 - **z/OSMF backend** — REST API alternative to SSH
 - **OAuth / MFA support** — enterprise authentication via Zowe API Mediation Layer (API ML)
-- **Console commands** — z/OS operator console (code ready, waiting for zowex server support)
-- **More prompts or skills* — JCL generation, COBOL analysis, batch job templates
+- **More prompts or skills** — JCL generation, batch job templates
 - **Resource subscriptions** — real-time data set change notifications
 
 </div>
@@ -1221,7 +1271,7 @@ An <strong class="text-[#1b375f]">MCP registry</strong> is a <strong class="text
 
 ### <carbon-collaborate class="inline text-[#3162ac]" /> Get Involved
 
-- **GitHub** — [github.com/zowe/zowe-mcp](https://github.com/zowe/zowe-mcp) - _coming soon_
+- **GitHub** — [github.com/zowe/zowe-mcp](https://github.com/zowe/zowe-mcp) — issues and PRs welcome
 - **npm** and **VS Code Marketplace** — not available yet
 - **Zowe Slack** — `#zowe-mcp` channel - _coming soon_
 
