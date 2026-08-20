@@ -87,8 +87,9 @@ Line-windowed pagination (readDataset, readUssFile, readJobFile, runSafeUssComma
 
 Job output routing:
 - Use a two-phase flow for job output: first discover spool files with listJobFiles, then read what you need.
+- listJobFiles returns the job status and return code with paginated spool-file metadata; it does not read spool content.
+- Use searchJobOutput to find a known string across spool files.
 - Use readJobFile for windowed in-context reads of one spool file. Use downloadJobFileToFile when output is large or unknown-size and should be searched from the local workspace.
-- getJobOutput is deprecated and returns only status plus spool-file metadata for compatibility; do not use it to read output content.
 
 If the task requires more data, do not answer with only the first page/window; keep calling until you have the desired amount of data.
 The response messages array contains the exact parameters for the next call when more data is available.

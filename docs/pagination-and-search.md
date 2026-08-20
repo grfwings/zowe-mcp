@@ -182,7 +182,7 @@ For tool execution errors (validation failure, blocked command), the tool return
 | `listJobFiles` | Jobs | Spool files (DDs) for a job |
 | `searchJobOutput` | Jobs | Spool file matches |
 
-`getJobOutput` is deprecated and returns only job status plus spool-file metadata for compatibility. Use `listJobFiles` for discovery, then `readJobFile` for windowed in-context reads or `downloadJobFileToFile` for large-output investigation.
+`listJobFiles` returns job-level `jobId`, `status`, and optional `retcode` fields alongside the paginated `files` array. The `_result` metadata and next-page messages apply to `data.files`.
 
 ### 3.2 Input parameters
 
@@ -476,13 +476,12 @@ runSafeUssCommand, runSafeTsoCommand):
 Job output routing:
 - Use a two-phase flow for job output: first discover spool files with
   listJobFiles, then read exactly what you need.
-- listJobFiles lists spool metadata only; it does not identify failed steps per
-  spool file.
+- listJobFiles returns the job status and return code with paginated spool-file
+  metadata; it does not read spool content.
+- Use searchJobOutput to find a known string across spool files.
 - Use readJobFile for windowed in-context reads of one spool file. Use
   downloadJobFileToFile when output is large or unknown-size and should be
   searched from the local workspace.
-- getJobOutput is deprecated and returns only status plus spool-file metadata
-  for compatibility; do not use it to read output content.
 
 If the task requires more data, do not answer with only the first page/window;
 keep calling until you have the desired amount of data.
@@ -539,6 +538,12 @@ Integration tests with `FilesystemMockBackend` and an in-memory MCP client:
 - `messages` is omitted when `hasMore` is false
 - `searchInDataset` envelope: `_result.linesFound`, `data.dataset`, `data.members`, `data.summary`
 - Search result cache: same parameters on the second call return cached data (no backend call)
+
+**`job-tools.test.ts`**
+
+- Confirms `getJobOutput` is not registered
+- Confirms `listJobFiles` returns job-level status and return code with paginated spool-file metadata
+- Confirms listing spool files does not read spool content
 
 ### 8.2 E2E tests
 

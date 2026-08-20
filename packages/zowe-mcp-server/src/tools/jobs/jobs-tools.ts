@@ -23,7 +23,7 @@ import { z } from 'zod';
 import { plural } from 'zowe-mcp-common';
 import { ResourceEffect } from '../../capability-level.js';
 import type { Logger } from '../../log.js';
-import type { JobFileEntry, JobStatusResult, ZosBackend } from '../../zos/backend.js';
+import type { JobStatusResult, ZosBackend } from '../../zos/backend.js';
 import type { CredentialProvider } from '../../zos/credentials.js';
 import type { JobCardStore } from '../../zos/job-cards.js';
 import { resolveSystemForTool, type SessionState } from '../../zos/session.js';
@@ -54,7 +54,6 @@ import {
   cancelJobOutputSchema,
   deleteJobOutputSchema,
   getJclOutputSchema,
-  getJobOutputOutputSchema,
   getJobStatusOutputSchema,
   holdJobOutputSchema,
   listJobFilesOutputSchema,
@@ -604,7 +603,7 @@ export function registerJobTools(server: McpServer, deps: JobToolDeps, logger: L
     {
       outputSchema: listJobFilesOutputSchema,
       description:
-        'List output files (spools) for a z/OS job. The job must be in OUTPUT status before spool files can be read; use readJobFile for windowed in-context reads or downloadJobFileToFile for large-output investigation.',
+        'List output files (spools) for a z/OS job, including the current job status and return code. Returns paginated metadata without reading spool content. Use readJobFile for windowed in-context reads or downloadJobFileToFile for large-output investigation.',
       _meta: { resourceEffectLevel: ResourceEffect.READ },
       inputSchema: {
         jobId: z.string().describe('Job ID (e.g. JOB00123 or J0nnnnnn).'),
@@ -651,21 +650,30 @@ export function registerJobTools(server: McpServer, deps: JobToolDeps, logger: L
         );
         await ensureContext(deps, systemId, resolvedUserId);
 
-        const allFiles = await deps.backend.listJobFiles(
-          systemId,
-          parsed.jobId,
-          extra._meta?.progressToken ? (msg: string) => void progress.step(msg) : undefined
-        );
+        const progressCb = extra._meta?.progressToken
+          ? (msg: string) => void progress.step(msg)
+          : undefined;
+        const status = await deps.backend.getJobStatus(systemId, parsed.jobId, progressCb);
+        const allFiles = await deps.backend.listJobFiles(systemId, parsed.jobId, progressCb);
 
         const offset = parsed.offset ?? 0;
         const limit = parsed.limit ?? DEFAULT_LIST_LIMIT;
-        const { data, meta } = paginateList(allFiles, offset, limit);
+        const { data: files, meta } = paginateList(allFiles, offset, limit);
 
         await progress.complete(
-          `Listed ${data.length} ${plural(data.length, 'job file', 'job files')} for job ${parsed.jobId} (${meta.totalAvailable} total)`
+          appendCompactRetcodeForProgress(
+            `Listed ${files.length} ${plural(files.length, 'job file', 'job files')} for job ${status.id} (${meta.totalAvailable} total)`,
+            status.retcode
+          )
         );
         const responseCtx = buildContext(systemId, {});
         const messages = getListMessages(meta);
+        const data = {
+          jobId: status.id,
+          status: status.status,
+          retcode: status.retcode,
+          files,
+        };
         return wrapResponse(responseCtx, meta, data, messages);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -716,7 +724,9 @@ export function registerJobTools(server: McpServer, deps: JobToolDeps, logger: L
           .int()
           .min(1)
           .optional()
-          .describe(`Number of lines to return, capped at ${MAX_READ_LINES} (default: all).`),
+          .describe(
+            `Number of lines to return. When omitted, up to ${MAX_READ_LINES} lines are returned.`
+          ),
       },
     },
     async (args, extra) => {
@@ -790,128 +800,11 @@ export function registerJobTools(server: McpServer, deps: JobToolDeps, logger: L
   );
 
   server.registerTool(
-    'getJobOutput',
-    {
-      outputSchema: getJobOutputOutputSchema,
-      description:
-        'Return job status and spool file metadata for compatibility with older clients. Deprecated: do not use this tool to read job output content; start with listJobFiles, then use readJobFile for windowed in-context reads or downloadJobFileToFile for large or unknown-size spool files.',
-      _meta: { resourceEffectLevel: ResourceEffect.READ },
-      inputSchema: {
-        jobId: z.string().describe('Job ID (e.g. JOB00123 or J0nnnnnn).'),
-        system: z
-          .string()
-          .optional()
-          .describe(
-            'Optional z/OS system (hostname). If omitted, the active system from setSystem is used.'
-          ),
-        failedStepsOnly: z
-          .boolean()
-          .optional()
-          .describe(
-            'Deprecated and ignored. This tool no longer guesses failed steps from DD names; use getJobStatus or inspect JES spool files, then read selected spool files with readJobFile.'
-          ),
-        jobFileIds: z
-          .array(z.number().int())
-          .optional()
-          .describe('Optional list of job file (spool) IDs to include in the returned metadata.'),
-        offset: z
-          .number()
-          .int()
-          .min(0)
-          .optional()
-          .describe('0-based offset for pagination over job files (default 0).'),
-        limit: z
-          .number()
-          .int()
-          .min(1)
-          .max(MAX_LIST_LIMIT)
-          .optional()
-          .describe(
-            `Number of job files to return (default ${DEFAULT_LIST_LIMIT}, max ${MAX_LIST_LIMIT}).`
-          ),
-      },
-    },
-    async (args, extra) => {
-      const progress = createToolProgress(extra, 'Get job output metadata');
-      await progress.start();
-      try {
-        const parsed = z
-          .object({
-            jobId: z.string(),
-            system: z.string().optional(),
-            failedStepsOnly: z.boolean().optional(),
-            jobFileIds: z.array(z.number().int()).optional(),
-            offset: z.number().int().min(0).optional(),
-            limit: z.number().int().min(1).max(MAX_LIST_LIMIT).optional(),
-          })
-          .parse(args);
-
-        const { systemId, userId: resolvedUserId } = resolveSystemForTool(
-          deps.systemRegistry,
-          deps.sessionState,
-          parsed.system
-        );
-        await ensureContext(deps, systemId, resolvedUserId);
-
-        const progressCb = extra._meta?.progressToken
-          ? (msg: string) => void progress.step(msg)
-          : undefined;
-        const status = await deps.backend.getJobStatus(systemId, parsed.jobId, progressCb);
-        const allFiles = await deps.backend.listJobFiles(systemId, parsed.jobId, progressCb);
-        let files = allFiles;
-        if (parsed.jobFileIds !== undefined && parsed.jobFileIds.length > 0) {
-          const idSet = new Set(parsed.jobFileIds);
-          files = allFiles.filter(f => idSet.has(f.id));
-        }
-
-        const offset = parsed.offset ?? 0;
-        const limit = parsed.limit ?? DEFAULT_LIST_LIMIT;
-        const { data: pageFiles, meta } = paginateList(files, offset, limit);
-
-        await progress.complete(
-          appendCompactRetcodeForProgress(
-            `Returned metadata for ${pageFiles.length} ${plural(pageFiles.length, 'job file', 'job files')} for job ${parsed.jobId} (${meta.totalAvailable} total)`,
-            status.retcode
-          )
-        );
-        const responseCtx = buildContext(systemId, {});
-        const messages = [
-          'getJobOutput is deprecated and no longer returns spool content. Use listJobFiles for discovery, readJobFile for windowed in-context reads, or downloadJobFileToFile for large or unknown-size spool files.',
-          ...getListMessages(meta),
-        ];
-        const data = {
-          jobId: parsed.jobId.toUpperCase(),
-          status: status.status,
-          retcode: status.retcode,
-          files: pageFiles.map(file => ({ ...file, jobFileId: file.id })),
-        };
-        return wrapResponse(responseCtx, meta, data, messages);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        log.debug('getJobOutput error', { error: message });
-        await progress.complete(message);
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify({
-                isError: true,
-                message,
-              }),
-            },
-          ],
-          isError: true,
-        };
-      }
-    }
-  );
-
-  server.registerTool(
     'searchJobOutput',
     {
       outputSchema: searchJobOutputOutputSchema,
       description:
-        "Search for a substring in a job's output files (all files or one by jobFileId). Returns matching lines with location and text. Use offset/limit to page results.",
+        "Search for a substring in a job's output files (all files or one by jobFileId). Returns matching lines with location and text. Use offset/limit to page results. For large or repeated searching, consider `downloadJobFileToFile` plus local tools.",
       _meta: { resourceEffectLevel: ResourceEffect.READ },
       inputSchema: {
         jobId: z.string().describe('Job ID (e.g. JOB00123 or J0nnnnnn).'),
@@ -979,13 +872,10 @@ export function registerJobTools(server: McpServer, deps: JobToolDeps, logger: L
           extra._meta?.progressToken ? (msg: string) => void progress.step(msg) : undefined
         );
 
-        let filesToSearch: JobFileEntry[];
-        if (parsed.jobFileId !== undefined) {
-          const match = allFiles.find(f => f.id === parsed.jobFileId);
-          filesToSearch = match ? [match] : [];
-        } else {
-          filesToSearch = allFiles;
-        }
+        const filesToSearch =
+          parsed.jobFileId === undefined
+            ? allFiles
+            : allFiles.filter(file => file.id === parsed.jobFileId);
 
         const searchStr = parsed.searchString;
         const caseSensitive = parsed.caseSensitive === true;
@@ -1503,6 +1393,6 @@ export function registerJobTools(server: McpServer, deps: JobToolDeps, logger: L
   );
 
   log.debug(
-    'Job tools registered: submitJob, getJobStatus, getJobOutput, listJobFiles, readJobFile, searchJobOutput, listJobs, getJcl, cancelJob, holdJob, releaseJob, deleteJob, submitJobFromDataset, submitJobFromUss'
+    'Job tools registered: submitJob, getJobStatus, listJobFiles, readJobFile, searchJobOutput, listJobs, getJcl, cancelJob, holdJob, releaseJob, deleteJob, submitJobFromDataset, submitJobFromUss'
   );
 }

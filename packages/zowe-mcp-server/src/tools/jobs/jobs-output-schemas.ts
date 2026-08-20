@@ -114,6 +114,17 @@ const jobFileEntrySchema = z.object({
   procstep: z.string().optional().describe('Procedure step name.'),
 });
 
+const listJobFilesDataSchema = z.object({
+  jobId: z.string().describe('Job ID.'),
+  status: z.string().describe('Current job status (e.g. OUTPUT).'),
+  retcode: z.string().optional().describe('Job return code when complete (e.g. CC 0000).'),
+  files: z
+    .array(jobFileEntrySchema)
+    .describe(
+      'Job file (spool) entries in this page. Each entry has id and optional ddname, stepname, dsname, and procstep.'
+    ),
+});
+
 const readJobFileDataSchema = z.object({
   lines: z
     .array(z.string())
@@ -125,19 +136,6 @@ const readJobFileDataSchema = z.object({
   returnedLines: z.number().describe('Number of lines returned.'),
   hasMore: z.boolean().describe('True if more lines exist.'),
   mimeType: z.string().describe('Content type (e.g. text/plain, text/x-jcl).'),
-});
-
-const getJobOutputFileMetadataSchema = jobFileEntrySchema.extend({
-  jobFileId: z.number().describe('Compatibility alias for id; pass this to readJobFile.'),
-});
-
-const getJobOutputDataSchema = z.object({
-  jobId: z.string().describe('Job ID.'),
-  status: z.string().describe('Job status (e.g. OUTPUT).'),
-  retcode: z.string().optional().describe('Job return code when complete (e.g. CC 0000).'),
-  files: z
-    .array(getJobOutputFileMetadataSchema)
-    .describe('Spool-file metadata only; use readJobFile or downloadJobFileToFile for content.'),
 });
 
 const searchJobOutputMatchSchema = z.object({
@@ -189,25 +187,15 @@ export const getJobStatusOutputSchema = envelopeSchema(
 );
 
 export const listJobFilesOutputSchema = envelopeSchema(
-  z
-    .array(jobFileEntrySchema)
-    .describe(
-      'Array of job file (spool) entries. Each entry has id, optional ddname, stepname, dsname, procstep.'
-    ),
+  listJobFilesDataSchema,
   listResultMetaSchema,
-  'Paginated list of job output files (spools). data[] has id, ddname, stepname; _result has count, offset, hasMore.'
+  'Paginated job output file metadata. data has jobId, status, retcode, and files[]; _result has count, offset, and hasMore for files.'
 );
 
 export const readJobFileOutputSchema = envelopeSchema(
   readJobFileDataSchema,
   readResultMetaSchema,
   'Content of one job file. data has lines, totalLines, startLine, returnedLines, hasMore, mimeType; _result has line-window metadata.'
-);
-
-export const getJobOutputOutputSchema = envelopeSchema(
-  getJobOutputDataSchema,
-  listResultMetaSchema,
-  'Deprecated compatibility response. data has jobId, status, retcode, and files[] metadata only; use readJobFile or downloadJobFileToFile for content.'
 );
 
 export const searchJobOutputOutputSchema = envelopeSchema(
