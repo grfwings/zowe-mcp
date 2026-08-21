@@ -539,12 +539,6 @@ Integration tests with `FilesystemMockBackend` and an in-memory MCP client:
 - `searchInDataset` envelope: `_result.linesFound`, `data.dataset`, `data.members`, `data.summary`
 - Search result cache: same parameters on the second call return cached data (no backend call)
 
-**`job-tools.test.ts`**
-
-- Confirms `getJobOutput` is not registered
-- Confirms `listJobFiles` returns job-level status and return code with paginated spool-file metadata
-- Confirms listing spool files does not read spool content
-
 ### 8.2 E2E tests
 
 **`mock-stdio.e2e.test.ts`**
