@@ -129,7 +129,7 @@
           ],
           "default": "zowex",
           "enumDescriptions": [
-            "Connect to z/OS via SSH (Zowe Remote SSH / zowex). Configure connections under Zowe Remote SSH.",
+            "Connect to z/OS via SSH (Zowe Remote SSH / zowex). Configure connections under Zowe MCP: Zowex Connections.",
             "Use local mock data for development and testing. A mock data directory will be configured automatically."
           ],
           "description": "Backend to use for z/OS operations. Changes require running 'Developer: Reload Window' command. If an older settings file still has the legacy value native, it is treated as zowex and updated when the extension reads settings.",
