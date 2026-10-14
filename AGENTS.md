@@ -35,6 +35,7 @@ Keep server behavior transport-independent. Transport implementations belong in 
 
 - Use `Logger` from `packages/zowe-mcp-server/src/log.ts` for logging. Never use `console.log` or `console.error` in the server.
 - Read the server version from its `package.json`; do not add another version constant.
+- Standalone stdio `--native` can select one `user@host[:port]` with `ZOWE_MCP_CONNECTION` when no `--system` or `--config` is set. `ZOWE_MCP_PASSWORD` applies only to that matching connection; existing per-connection env vars and `ZOWE_MCP_CREDENTIALS` take precedence. Never use the fixed pair as HTTP multi-user credentials.
 - Keep MCP tool, prompt, and resource names concise and camelCase. Do not add a redundant `zowe` prefix.
 - Use existing shared helpers for system resolution, data set name resolution, response envelopes, pagination, progress, encoding, command safety, and caching. Do not create parallel implementations.
 

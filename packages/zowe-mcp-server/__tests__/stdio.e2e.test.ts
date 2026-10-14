@@ -50,6 +50,25 @@ describe('Zowe MCP Server (stdio-specific)', () => {
     expect(tools.length).toBeGreaterThan(0);
   });
 
+  it('keeps explicit --system ahead of the fixed env connection', async () => {
+    const transport = new StdioClientTransport({
+      command: 'node',
+      args: [serverPath, '--stdio', '--native', '--system', 'EXPLICIT@explicit.example.com'],
+      env: {
+        ...process.env,
+        ZOWE_MCP_CONNECTION: 'ENV@env.example.com',
+        ZOWE_MCP_PASSWORD: 'unused',
+      },
+    });
+    client = new Client({ name: 'e2e-precedence-test', version: '1.0.0' });
+    await client.connect(transport);
+    const result = await client.callTool({ name: 'listSystems', arguments: {} });
+    const systems = JSON.parse((result.content as { text: string }[])[0].text) as {
+      systems: { host: string }[];
+    };
+    expect(systems.systems.map(s => s.host)).toEqual(['explicit.example.com']);
+  });
+
   it('should default to stdio when no transport flag is given', async () => {
     const transport = new StdioClientTransport({
       command: 'node',

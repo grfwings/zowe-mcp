@@ -100,6 +100,29 @@ including standalone stdio, server-side HTTP, CLI bridge plugins, and
 `call-tool`. For native SSH, the server can use MCP elicitation after checking
 the configured password sources.
 
+### One connection per stdio subprocess (fixed env names)
+
+For a client that injects a distinct environment for each spawned stdio server (such as Executor `stdio_env`), use `--native` without `--system` or `--config` and inject:
+
+```json
+{
+  "mcpServers": {
+    "zowe": {
+      "command": "zowe-mcp-server",
+      "args": ["--stdio", "--native"],
+      "env": {
+        "ZOWE_MCP_CONNECTION": "USERID@zos.example.com",
+        "ZOWE_MCP_PASSWORD": "replace-with-secret"
+      }
+    }
+  }
+}
+```
+
+`ZOWE_MCP_CONNECTION` accepts `user@host` or `user@host:port`. The fixed password is only used for that matching connection in standalone stdio, after existing per-connection password env vars and `ZOWE_MCP_CREDENTIALS`, but before Vault. SSH keys remain preferred. An explicit `--system` / `--config` takes priority over the env connection. Never use this process-wide pair as HTTP multi-tenant credentials. For managed deployments, the administrator supplies `--capability-tier read` in the controlled process launch, not in user-provided connection variables.
+
+Inject secrets at runtime rather than committing a real password to MCP config. Executor's self-host Docker image does not include Node; running this stdio server there requires a custom image with Node and the server installed, or a suitable runtime/server mount.
+
 ### Per-connection env vars: `ZOWE_MCP_PASSWORD_<USER>_<HOST>`
 
 **Format:** `ZOWE_MCP_PASSWORD_<USER>_<HOST>`

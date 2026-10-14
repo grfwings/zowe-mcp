@@ -1153,9 +1153,7 @@ async function main(): Promise<void> {
 
   const parsed = parseArgs();
 
-  if (parsed.transport === 'http') {
-    process.env.ZOWE_MCP_TRANSPORT = 'http';
-  }
+  process.env.ZOWE_MCP_TRANSPORT = parsed.transport;
 
   const {
     transport,
@@ -1257,6 +1255,19 @@ async function main(): Promise<void> {
     });
   } else if (zowex) {
     let systems: string[] = [...systemSpecs];
+    // Executor-style stdio clients can supply one connection per subprocess without
+    // generating a --system argument. Explicit --system / --config still take priority.
+    if (
+      transport === 'stdio' &&
+      !extensionClient?.connected &&
+      !configPath &&
+      systems.length === 0 &&
+      process.env.ZOWE_MCP_CONNECTION?.trim()
+    ) {
+      const connection = process.env.ZOWE_MCP_CONNECTION.trim();
+      parseConnectionSpec(connection);
+      systems = [connection];
+    }
     const jobCardStore = createWaitableJobCardStore();
     if (configPath) {
       try {
@@ -1284,7 +1295,7 @@ async function main(): Promise<void> {
       systems.length === 0;
     if (systems.length === 0 && !extensionConnected && !allowEmptyBaseNative) {
       logger.error(
-        'Native mode requires at least one system when run standalone. Use --config <path> (JSON with "systems" array) or --system user@host (repeatable). For HTTP with JWT and ZOWE_MCP_TENANT_STORE_DIR, you may start with no base systems and use tenant store files or addZosConnection.'
+        'Native mode requires at least one system when run standalone. Use --config <path> (JSON with "systems" array), --system user@host (repeatable), or ZOWE_MCP_CONNECTION for one stdio connection. For HTTP with JWT and ZOWE_MCP_TENANT_STORE_DIR, you may start with no base systems and use tenant store files or addZosConnection.'
       );
       process.exit(1);
     }
@@ -1605,7 +1616,7 @@ async function main(): Promise<void> {
    * Populates profilesByType and activeProfileId from the file.
    * When the VS Code extension is connected, the password resolver sends a
    * request-password event and waits for the response via cliPluginPasswordStore.
-   * In standalone mode it falls back to ZOWE_MCP_PASSWORD_<USER>_<HOST> or ZOWE_MCP_CREDENTIALS.
+   * In standalone mode it resolves env/Vault passwords via resolveStandalonePassword.
    */
   function buildPluginState(
     profilesFile: CliPluginProfilesFile,

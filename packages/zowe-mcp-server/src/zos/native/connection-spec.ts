@@ -211,7 +211,8 @@ export function parseZoweMcpCredentialsEnv(raw: string | undefined): Map<string,
 /**
  * Standalone password resolution for native SSH and CLI bridge plugins.
  *
- * Precedence: `ZOWE_MCP_PASSWORD_<USER>_<HOST>` (existing) first, then `ZOWE_MCP_CREDENTIALS` JSON map.
+ * Precedence: `ZOWE_MCP_PASSWORD_<USER>_<HOST>`, then `ZOWE_MCP_CREDENTIALS`,
+ * then `ZOWE_MCP_PASSWORD` for the single matching `ZOWE_MCP_CONNECTION` in stdio mode.
  */
 export function getStandalonePasswordFromEnv(spec: ParsedConnectionSpec): string | undefined {
   const envVar = toPasswordEnvVarName(spec.user, spec.host);
@@ -224,6 +225,20 @@ export function getStandalonePasswordFromEnv(spec: ParsedConnectionSpec): string
   const fromMap = map.get(key);
   if (fromMap !== undefined && fromMap !== '') {
     return fromMap;
+  }
+  // A fixed secret name is useful for clients that inject a different env per stdio
+  // subprocess. Never apply it to another connection (or to a shared HTTP server).
+  const connection = process.env.ZOWE_MCP_CONNECTION?.trim();
+  if (process.env.ZOWE_MCP_TRANSPORT === 'stdio' && connection && process.env.ZOWE_MCP_PASSWORD) {
+    try {
+      const selected = parseConnectionSpec(connection);
+      if (toConnectionsEnvLookupKey(selected.user, selected.host, selected.port) === key) {
+        return process.env.ZOWE_MCP_PASSWORD;
+      }
+    } catch {
+      // An unrelated explicit --system / --config must not fail because of this env var.
+      // The stdio startup path validates it when it is actually selected as the system.
+    }
   }
   return undefined;
 }
