@@ -10,12 +10,13 @@ for the VS Code extension lives in
 Add an entry under **Unreleased** in the same PR that makes the change. PRs that
 don't warrant an entry (CI, chores, internal refactors, docs-only) can carry the
 `no-changelog` label instead — see
-[CONTRIBUTING.md](CONTRIBUTING.md#continuous-integration--branch-protection).
+[CONTRIBUTING.md](CONTRIBUTING.md#pull-requests).
 
 ## [Unreleased]
 
 ### Added
 
+- New `display` tool, available from capability tier `read`: runs a z/OS operator `DISPLAY` console command (e.g. `D IPLINFO`). This enables users with only `read`-level access to view system information.
 - Added the `queryTso` tool, available at capability tier `read`: runs read-only TSO query commands (`LISTUSER`, `LISTGRP`, `LISTDSD`, `RLIST`, `SEARCH`, `LISTDS`, `LISTALC`, `LISTCAT`, `LISTBC`, `STATUS`, `WHO`, `TIME`, `SYSTEM`, `HELP`) without a confirmation prompt. The command is restricted to a fixed set of query verbs and a character allowlist (no `;`, newlines, or shell metacharacters), and must also be classified safe by the shared TSO safety patterns. The RACF query commands `LISTGRP`, `LISTDSD`, `RLIST`, and `SEARCH` were added to the safe list (`SEARCH ... CLIST` still requires approval because it writes a data set), so `runSafeTsoCommand` at tier `full` now runs them without prompting too. RACF output is limited to what the signed-in user is authorized to see.
 - Enabled the `runConsoleCommand` tool (z/OS operator console commands) at capability tier `full`. Requires zowex 0.9.0+ on the host and the separately installed APF-authorized `zoweax` binary; each command is authorized by the site ESM (OPERCMDS). Safe DISPLAY commands run directly, state-changing commands require user confirmation via elicitation, and system-stopping commands are blocked. Failures map to actionable guidance (server too old, zoweax missing, not authorized).
 - Binary (base64, no-conversion) transfer on `readDataset`, `writeDataset`, `readUssFile`, and `writeUssFile` via a new optional `binary` input: reads return `data.contentBase64`, writes take `contentBase64` instead of `lines`. For non-text content (tersed files, load modules) that the UTF-8/EBCDIC text path would corrupt. Binary dataset writes require a preallocated target. Note that the z/OS server writes the byte stream as fixed-length records, NUL-pads the last record, and does not preserve the target's RECFM/LRECL (validated on a real z/OS: an FB/1024 sequential data set came back FB/80 after a binary write) — the bytes read back through `readDataset` are exact, but re-check the DCB attributes if another z/OS program consumes the data set. USS binary transfer is byte-exact with no such caveat.
@@ -76,10 +77,7 @@ don't warrant an entry (CI, chores, internal refactors, docs-only) can carry the
   `chat.agentHost.enabled: false` (the classic-panel routing is
   experiment-controlled) and seed `chat.byokUtilityModelDefault: mainAgent`
   for 0.60.0's BYOK utility-model side-flows. S1–S3 pass unmodified on
-  1.132.0 (and still on 1.126); the CI pin moves to 1.132.0. Full
-  investigation notes (Agent Host routing internals, MCP-forwarding into
-  agent sessions, and a working Playwright panel-typing fallback) in
-  `docs/vscode-132-agent-host-investigation.md`.
+  1.132.0 (and still on 1.126); the CI pin moves to 1.132.0.
 
 - **End-to-end Copilot Chat testing** (`packages/zowe-mcp-e2e`): a scripted
   harness that drives a from-scratch, isolated VS Code instance with the built
@@ -160,7 +158,7 @@ don't warrant an entry (CI, chores, internal refactors, docs-only) can carry the
   mode is gone — `pin` replaces it.
 
 - **Releases are now built and published by CI** via a reviewed release PR —
-  see [docs/release-process.md](docs/release-process.md). The manual
+  see [RELEASING.md](RELEASING.md). The manual
   `release-vsix` script has been replaced by `ci:package-release`
   (build/package only; CI owns tagging and publishing).
 - **Session default: first configured system instead of an error.** When a tool
