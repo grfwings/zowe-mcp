@@ -99,7 +99,22 @@ npx @zowe/mcp-server --stdio --native --config ./native-config.json
 
 # CLI (repeatable)
 npx @zowe/mcp-server --stdio --native --system USERID@sys1.example.com
+
+# One native connection per standalone stdio subprocess (e.g. Executor stdio_env)
+ZOWE_MCP_CONNECTION=USERID@sys1.example.com ZOWE_MCP_PASSWORD=password \
+  npx @zowe/mcp-server --stdio --native
 ```
+
+The fixed `ZOWE_MCP_CONNECTION` / `ZOWE_MCP_PASSWORD` pair is opt-in: it is
+used only with `--native` in standalone stdio mode. The connection is selected
+only when neither `--system` nor `--config` is supplied. The fixed password
+applies only to the matching connection, not to other systems. Existing
+password sources take priority (per-connection `ZOWE_MCP_PASSWORD_*`, then
+`ZOWE_MCP_CREDENTIALS`); SSH keys are still preferred. Each subprocess must
+receive its own identity and secret; do not use these process variables as
+HTTP multi-tenant credentials. The capability tier is configured by the
+operator, not by the connection: for read-only access, launch with
+`--capability-tier read`. Keep secrets out of committed client configs.
 
 Config file format:
 

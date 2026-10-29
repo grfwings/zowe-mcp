@@ -147,6 +147,40 @@ describe('Zowe MCP Server (native backend against mock z/OS, stdio E2E)', () => 
     }
   }, 60_000);
 
+  it('accepts a single connection and password from fixed stdio env names', async () => {
+    const connection = `${MOCK_USER}@${MOCK_HOST}:${mock.sshPort}`;
+    const env: NodeJS.ProcessEnv = {
+      ...process.env,
+      ZOWE_MCP_CONNECTION: connection,
+      ZOWE_MCP_PASSWORD: 'password',
+      ZOWE_MCP_DISABLE_SSH_KEY: '1',
+    };
+    delete env[toPasswordEnvVarName(MOCK_USER, MOCK_HOST)];
+    delete env.ZOWE_MCP_CREDENTIALS;
+    delete env.ZOWE_MCP_TRANSPORT;
+    const transport = new StdioClientTransport({
+      command: 'node',
+      args: [serverPath, '--stdio', '--native', '--capability-tier', 'read'],
+      env: env as Record<string, string>,
+    });
+    const envClient = new Client({ name: 'e2e-fixed-env-test', version: '1.0.0' });
+    try {
+      await envClient.connect(transport);
+      const { parsed: systems } = await callToolSuccess(envClient, 'listSystems', {});
+      expect(
+        (systems as { systems: { connections: string[] }[] }).systems[0].connections
+      ).toContain(connection);
+      const { parsed } = await callToolSuccess(envClient, 'listDatasets', {
+        dsnPattern: "'USER1.*'",
+      });
+      expect((parsed as { data: { dsn: string }[] }).data.map(d => d.dsn)).toContain(
+        SEEDED_PDS_DSN
+      );
+    } finally {
+      await envClient.close();
+    }
+  }, 120_000);
+
   it('tools/list returns the expected native/zowex tool set', async () => {
     const { tools } = await client.listTools();
     const names = tools.map(t => t.name);

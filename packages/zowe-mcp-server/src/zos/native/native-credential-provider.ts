@@ -13,7 +13,7 @@
  * Credential provider for the Zowe Remote SSH (native SSH) backend.
  *
  * Standalone mode: reads passwords from ZOWE_MCP_PASSWORD_<USER>_<HOST>, ZOWE_MCP_CREDENTIALS (JSON map),
- * then optional Vault KV (see `vault-kv-credentials.ts`). If still unset and
+ * then ZOWE_MCP_PASSWORD for the matching ZOWE_MCP_CONNECTION in stdio, then optional Vault KV (see `vault-kv-credentials.ts`). If still unset and
  * {@link NativeCredentialProviderOptions.requestPasswordViaElicitation} is configured (stdio/HTTP with an MCP
  * client that supports elicitation), the server prompts via MCP elicitation and **caches** the password
  * in memory for the **process lifetime** (cleared on {@link markInvalid}). Cross-restart persistence is not

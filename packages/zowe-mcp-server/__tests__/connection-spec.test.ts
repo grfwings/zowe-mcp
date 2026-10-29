@@ -9,7 +9,7 @@
  *
  */
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   getStandalonePasswordFromEnv,
   isEnvFlagSet,
@@ -176,6 +176,56 @@ describe('connection-spec', () => {
 
     it('throws when not an object', () => {
       expect(() => parseZoweMcpCredentialsEnv('[]')).toThrow('JSON object');
+    });
+  });
+
+  describe('fixed stdio password env', () => {
+    const selected = parseConnectionSpec('USER@host.example.com:2222');
+    const other = parseConnectionSpec('OTHER@host.example.com:2222');
+
+    beforeEach(() => vi.stubEnv('ZOWE_MCP_TRANSPORT', 'stdio'));
+    afterEach(() => vi.unstubAllEnvs());
+
+    it('uses the fixed password only for the matching connection (including port)', () => {
+      vi.stubEnv('ZOWE_MCP_CONNECTION', ' user@HOST.EXAMPLE.COM:2222 ');
+      vi.stubEnv('ZOWE_MCP_PASSWORD', 'fixed-secret');
+      vi.stubEnv('ZOWE_MCP_CREDENTIALS', '');
+      vi.stubEnv(toPasswordEnvVarName(selected.user, selected.host), '');
+      vi.stubEnv(toPasswordEnvVarName(other.user, other.host), '');
+      expect(getStandalonePasswordFromEnv(selected)).toBe('fixed-secret');
+      expect(getStandalonePasswordFromEnv(other)).toBeUndefined();
+      expect(
+        getStandalonePasswordFromEnv(parseConnectionSpec('USER@host.example.com'))
+      ).toBeUndefined();
+    });
+
+    it('preserves legacy password precedence and ignores blank fixed passwords', () => {
+      vi.stubEnv('ZOWE_MCP_CONNECTION', 'USER@host.example.com:2222');
+      vi.stubEnv('ZOWE_MCP_PASSWORD', 'fixed-secret');
+      vi.stubEnv(
+        'ZOWE_MCP_CREDENTIALS',
+        JSON.stringify({ 'user@host.example.com:2222': 'json-secret' })
+      );
+      vi.stubEnv(toPasswordEnvVarName(selected.user, selected.host), '');
+      expect(getStandalonePasswordFromEnv(selected)).toBe('json-secret');
+      vi.stubEnv(toPasswordEnvVarName(selected.user, selected.host), 'per-connection-secret');
+      expect(getStandalonePasswordFromEnv(selected)).toBe('per-connection-secret');
+      vi.stubEnv(toPasswordEnvVarName(selected.user, selected.host), '');
+      vi.stubEnv('ZOWE_MCP_CREDENTIALS', '');
+      vi.stubEnv('ZOWE_MCP_PASSWORD', '');
+      expect(getStandalonePasswordFromEnv(selected)).toBeUndefined();
+    });
+
+    it('does not use fixed password in HTTP or without an opted-in connection', () => {
+      vi.stubEnv('ZOWE_MCP_CONNECTION', 'USER@host.example.com:2222');
+      vi.stubEnv('ZOWE_MCP_PASSWORD', 'fixed-secret');
+      vi.stubEnv('ZOWE_MCP_CREDENTIALS', '');
+      vi.stubEnv(toPasswordEnvVarName(selected.user, selected.host), '');
+      vi.stubEnv('ZOWE_MCP_TRANSPORT', 'http');
+      expect(getStandalonePasswordFromEnv(selected)).toBeUndefined();
+      vi.stubEnv('ZOWE_MCP_TRANSPORT', 'stdio');
+      vi.stubEnv('ZOWE_MCP_CONNECTION', '');
+      expect(getStandalonePasswordFromEnv(selected)).toBeUndefined();
     });
   });
 
