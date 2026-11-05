@@ -159,6 +159,34 @@ describe('USS tools integration', () => {
     }
   });
 
+  it('listUssFiles on a file path returns the file with its own path, not path/name', async () => {
+    const result = await client.callTool({
+      name: 'listUssFiles',
+      arguments: { path: '/u/testuser/file.txt', longFormat: true },
+    });
+    const envelope = JSON.parse(getResultText(result)) as {
+      data: { name: string; path: string; size?: number }[];
+    };
+    expect(envelope.data).toHaveLength(1);
+    expect(envelope.data[0].name).toBe('file.txt');
+    expect(envelope.data[0].path).toBe('file.txt');
+    expect(envelope.data[0].size).toBe(14);
+  });
+
+  it('listUssFiles keeps path/name for a directory that contains a same-named entry', async () => {
+    const dir = path.join(mockDir, 'uss', SYSTEM_HOST, 'u', DEFAULT_USER, 'same');
+    await fs.mkdir(path.join(dir, 'same'), { recursive: true });
+    const result = await client.callTool({
+      name: 'listUssFiles',
+      arguments: { path: '/u/testuser/same' },
+    });
+    const envelope = JSON.parse(getResultText(result)) as {
+      data: { name: string; path: string }[];
+    };
+    expect(envelope.data).toHaveLength(1);
+    expect(envelope.data[0].path).toBe('same/same');
+  });
+
   it('readUssFile returns envelope with text and _result', async () => {
     const result = await client.callTool({
       name: 'readUssFile',

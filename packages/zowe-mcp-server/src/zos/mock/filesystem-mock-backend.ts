@@ -743,11 +743,12 @@ export class FilesystemMockBackend implements ZosBackend {
     if (!(await pathExists(localPath))) {
       throw new Error(`USS path '${ussPath}' not found on ${systemId}.`);
     }
-    if (!(await isDirectory(localPath))) {
-      throw new Error(`USS path '${ussPath}' is not a directory on ${systemId}.`);
-    }
     const includeHidden = options?.includeHidden ?? false;
     const longFormat = options?.longFormat ?? false;
+    if (!(await isDirectory(localPath))) {
+      // Like zowex: listing a file returns that file as the single entry.
+      return [await this.toUssEntry(localPath, path.basename(localPath), longFormat)];
+    }
     const entries = await fs.readdir(localPath, { withFileTypes: true });
     const results: UssFileEntry[] = [];
     for (const e of entries) {

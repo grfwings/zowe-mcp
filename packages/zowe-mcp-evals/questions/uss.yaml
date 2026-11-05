@@ -99,3 +99,28 @@ questions:
           tool: listUssFiles
       - answerContains:
           pattern: '2|two|file.txt|subdir'
+
+  - id: uss-list-permissions
+    prompt: What are the permissions and modification time of the files in my USS home directory (like ls -l)?
+    assertions:
+      # ls -l style details (mode, size, mtime, owner) are only returned with longFormat.
+      - toolCall:
+          tool: listUssFiles
+          args:
+            longFormat: true
+      - answerContains:
+          pattern: 'rw|r--|[0-7]{3}|mode|permission'
+
+  - id: uss-list-single-file-metadata
+    prompt: What is the size of /u/USER/file.txt on the mainframe?
+    assertions:
+      # Listing a file path returns that file as its own entry; longFormat gives the size.
+      - toolCall:
+          tool: listUssFiles
+          args:
+            path:
+              - '/u/USER/file.txt'
+              - 'file.txt'
+            longFormat: true
+      - answerContains:
+          pattern: '58'

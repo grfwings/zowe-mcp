@@ -1600,7 +1600,7 @@ Output:
 
 > Read-only
 
-List files and directories in a USS path (the z/OS UNIX equivalent of "ls"). Results are paginated (default 500, max 1000 per page); follow the pagination instructions in the server instructions. Use for requests like "ls", "show the files in <dir>", or "what is in my home directory" (resolve the home directory with getUssHome when the user means "home").
+List files and directories in a USS path (the z/OS UNIX equivalent of "ls"). Results are paginated (default 500, max 1000 per page); follow the pagination instructions in the server instructions. Use for requests like "ls", "show the files in <dir>", or "what is in my home directory" (resolve the home directory with getUssHome when the user means "home"). Set longFormat for owner, group, permissions, size and modification time (ls -l). Listing a file path returns that file as the single entry, with its own path.
 
 #### Parameters
 
@@ -1609,7 +1609,7 @@ List files and directories in a USS path (the z/OS UNIX equivalent of "ls"). Res
 | `path`          | `string`  | Yes      | USS directory path: absolute (starts with /) or relative to current working directory (see getContext.ussCwd).                                                                                                                                                                                                      |
 | `system`        | `string`  | No       | Optional. Target z/OS system (a host, or user@host when several connections exist). Omit it to use the active/default connection — you do not need to select or set a system first, and you should still call the tool when no system has been chosen yet. Specify it only to target a different configured system. |
 | `includeHidden` | `boolean` | No       | Include hidden files (names starting with .). (default: `false`)                                                                                                                                                                                                                                                    |
-| `longFormat`    | `boolean` | No       | Return long format (mode, size, mtime, name). (default: `false`)                                                                                                                                                                                                                                                    |
+| `longFormat`    | `boolean` | No       | Return long format: each entry also has mode (permissions), size, mtime and filetag, plus links, user (owner) and group when the host reports them. Use this for ls -l style questions about ownership or permissions. Default: false (names and paths only). (default: `false`)                                    |
 | `offset`        | `integer` | No       | 0-based offset. Default: 0.                                                                                                                                                                                                                                                                                         |
 | `limit`         | `integer` | No       | Max items per page. Default: 500. Max: 1000.                                                                                                                                                                                                                                                                        |
 
