@@ -74,7 +74,11 @@ import { runSearchWithListAndRead, type SearchBackendAdapter } from '../search-r
 import type { SystemId } from '../system.js';
 import type { ParsedConnectionSpec } from './connection-spec.js';
 import type { NativeCredentialProvider } from './native-credential-provider.js';
-import { formatErrorWithDetails, getAdditionalDetails } from './sdk-error-details.js';
+import {
+  formatErrorWithDetails,
+  getAdditionalDetails,
+  getTsoWarningOutput,
+} from './sdk-error-details.js';
 import { cacheKey, type SshClientCache } from './ssh-client-cache.js';
 import {
   installStderrAbendCapture,
@@ -1734,8 +1738,20 @@ export class NativeBackend {
         log.info('runTsoCommand resolving tso API', { systemId, commandText });
         const tso = this.getTso(client);
         log.info('runTsoCommand calling tso.issueCmd', { systemId, commandText });
-        const response = await tso.issueCmd({ commandText });
-        const data = response.data ?? '';
+        let data: string;
+        try {
+          data = (await tso.issueCmd({ commandText })).data ?? '';
+        } catch (err) {
+          // rc 4 is a TSO warning (e.g. LISTCAT / SEARCH found no matches), not a failure:
+          // return its output so the caller sees "NOT FOUND" text rather than a tool error.
+          const warningOutput = getTsoWarningOutput(err);
+          if (warningOutput === undefined) throw err;
+          log.debug('runTsoCommand ended with rc 4 (warning); returning output', {
+            systemId,
+            commandText,
+          });
+          data = warningOutput;
+        }
         const maxLogOutput = 2000;
         const outputPreview =
           data.length <= maxLogOutput ? data : data.slice(0, maxLogOutput) + '... (truncated)';
