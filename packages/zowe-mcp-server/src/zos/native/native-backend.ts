@@ -173,7 +173,16 @@ interface NativeUssApi {
     depth?: number;
     maxItems?: number;
   }): Promise<{
-    items?: { name: string; size?: number; mode?: string; mtime?: string; filetag?: string }[];
+    items?: {
+      name: string;
+      links?: number;
+      user?: string;
+      group?: string;
+      size?: number;
+      mode?: string;
+      mtime?: string;
+      filetag?: string;
+    }[];
     returnedRows?: number;
   }>;
   readFile(req: { fspath: string; encoding?: string; localEncoding?: string }): Promise<{
@@ -1421,6 +1430,9 @@ export class NativeBackend {
 
   private mapUssItem(item: {
     name: string;
+    links?: number;
+    user?: string;
+    group?: string;
     size?: number;
     mode?: string;
     mtime?: string;
@@ -1428,6 +1440,9 @@ export class NativeBackend {
   }): UssFileEntry {
     return {
       name: item.name,
+      links: item.links,
+      user: item.user,
+      group: item.group,
       size: item.size,
       mode: item.mode,
       mtime: item.mtime,

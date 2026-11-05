@@ -160,6 +160,18 @@ function createFakeClient(overrides?: {
     string: string;
     parms?: string;
   }) => Promise<{ data?: string }>;
+  ussListFiles?: (req: { fspath: string; long?: boolean }) => Promise<{
+    items?: {
+      name: string;
+      links?: number;
+      user?: string;
+      group?: string;
+      size?: number;
+      mode?: string;
+      mtime?: string;
+      filetag?: string;
+    }[];
+  }>;
   /**
    * Stub for `client.certificates.trustCertificate`. Typed with the SDK's own response type so a
    * field rename upstream breaks this fixture at compile time, not just at runtime.
@@ -203,6 +215,10 @@ function createFakeClient(overrides?: {
 
   if (overrides?.toolSearch) {
     client.tool = { search: overrides.toolSearch };
+  }
+
+  if (overrides?.ussListFiles) {
+    client.uss = { listFiles: overrides.ussListFiles };
   }
 
   if (overrides?.trustCertificate) {
@@ -580,6 +596,44 @@ describe('NativeBackend', () => {
       const backend = new NativeBackend(options);
 
       await expect(backend.listDatasets(SYSTEM_ID, 'USER.*')).rejects.toThrow('Some SDK error');
+    });
+  });
+
+  describe('listUssFiles', () => {
+    it('maps owner, group and link count from the SDK long listing', async () => {
+      const ussListFiles = vi.fn().mockResolvedValue({
+        items: [
+          {
+            name: 'imsudb.jar',
+            links: 1,
+            user: 'IMSADM',
+            group: 'IMSGRP',
+            size: 4096,
+            mode: '-rw-r--r--',
+            mtime: '2024-01-02T03:04:05',
+            filetag: 'untagged',
+          },
+        ],
+      });
+      const backend = createBackendWithClient({ ussListFiles });
+
+      const result = await backend.listUssFiles(SYSTEM_ID, '/u/ims', { longFormat: true });
+
+      expect(ussListFiles).toHaveBeenCalledWith(
+        expect.objectContaining({ fspath: '/u/ims', long: true })
+      );
+      expect(result).toEqual([
+        {
+          name: 'imsudb.jar',
+          links: 1,
+          user: 'IMSADM',
+          group: 'IMSGRP',
+          size: 4096,
+          mode: '-rw-r--r--',
+          mtime: '2024-01-02T03:04:05',
+          filetag: 'untagged',
+        },
+      ]);
     });
   });
 

@@ -20,7 +20,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { ResourceEffect } from '../../capability-level.js';
 import type { Logger } from '../../log.js';
-import type { ZosBackend } from '../../zos/backend.js';
+import type { UssFileEntry, ZosBackend } from '../../zos/backend.js';
 import type { CredentialProvider } from '../../zos/credentials.js';
 import type { EncodingOptions } from '../../zos/encoding.js';
 import { resolveDatasetEncoding } from '../../zos/encoding.js';
@@ -66,6 +66,39 @@ import {
   runSafeUssCommandOutputSchema,
   writeUssFileOutputSchema,
 } from './uss-output-schemas.js';
+
+/**
+ * Whether `resolvedPath` is a file rather than a directory, given the entries returned when
+ * listing it. Listing a file returns the file itself as the only entry, which is
+ * indistinguishable from a directory containing a single same-named entry, so that case is
+ * resolved by looking the path up in its parent directory. Any failure is treated as "not a
+ * file" (the previous behavior).
+ */
+async function isListedPathAFile(
+  backend: ZosBackend,
+  systemId: string,
+  resolvedPath: string,
+  items: UssFileEntry[],
+  userId: string | undefined
+): Promise<boolean> {
+  const trimmed = resolvedPath.replace(/\/+$/, '');
+  const slash = trimmed.lastIndexOf('/');
+  const baseName = trimmed.slice(slash + 1);
+  if (items.length !== 1 || baseName === '' || items[0].name !== baseName) return false;
+  try {
+    const parent = await backend.listUssFiles(
+      systemId,
+      slash <= 0 ? '/' : trimmed.slice(0, slash),
+      { includeHidden: true, longFormat: true },
+      userId
+    );
+    const self = parent.find(e => e.name === baseName);
+    if (!self) return false;
+    return self.isDirectory === undefined ? !self.mode?.startsWith('d') : !self.isDirectory;
+  } catch {
+    return false;
+  }
+}
 
 async function ensureContext(
   deps: { sessionState: SessionState; credentialProvider: CredentialProvider },
@@ -232,7 +265,9 @@ export function registerUssTools(server: McpServer, deps: UssToolDeps, logger: L
       description: withPaginationNote(
         'List files and directories in a USS path (the z/OS UNIX equivalent of "ls"). ' +
           'Use for requests like "ls", "show the files in <dir>", or "what is in my home directory" ' +
-          '(resolve the home directory with getUssHome when the user means "home").',
+          '(resolve the home directory with getUssHome when the user means "home"). ' +
+          'Set longFormat for owner, group, permissions, size and modification time (ls -l). ' +
+          'Listing a file path returns that file as the single entry, with its own path.',
         PAGINATION_NOTE_LIST
       ),
       _meta: { resourceEffectLevel: ResourceEffect.READ },
@@ -252,7 +287,10 @@ export function registerUssTools(server: McpServer, deps: UssToolDeps, logger: L
           .boolean()
           .optional()
           .default(false)
-          .describe('Return long format (mode, size, mtime, name).'),
+          .describe(
+            'Return long format: each entry also has mode (permissions), size, mtime and filetag, plus links, user (owner) and group when the host reports them. ' +
+              'Use this for ls -l style questions about ownership or permissions. Default: false (names and paths only).'
+          ),
         offset: z.number().int().min(0).optional().describe('0-based offset. Default: 0.'),
         limit: z
           .number()
@@ -313,8 +351,17 @@ export function registerUssTools(server: McpServer, deps: UssToolDeps, logger: L
         const currentDirDisplay = effectiveCwd
           ? relativizeForDisplay(effectiveCwd, effectiveCwd)
           : resolvedPath;
+        const listedPathIsFile = await isListedPathAFile(
+          deps.backend,
+          systemId,
+          resolvedPath,
+          items,
+          userId
+        );
         const dataWithPaths = pageItems.map(entry => {
-          const fullPath = resolvedPath.replace(/\/+$/, '') + '/' + entry.name;
+          const fullPath = listedPathIsFile
+            ? resolvedPath
+            : resolvedPath.replace(/\/+$/, '') + '/' + entry.name;
           const pathDisplay = relativizeForDisplay(fullPath, effectiveCwd);
           return { ...entry, path: pathDisplay };
         });
