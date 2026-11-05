@@ -40,3 +40,35 @@ export function formatErrorWithDetails(message: string, details?: string): strin
   if (!details) return message;
   return `${message}\nDetails:\n${details.replace(ESM_CODE_KEY, '"product$1Code"$2')}`;
 }
+
+/**
+ * Extracts the command output from an SDK error raised for a TSO command that ended with
+ * return code 4.
+ *
+ * In TSO, rc 4 is a warning, not a failure: `LISTCAT LEVEL(x)` and `SEARCH CLASS(USER) MASK(x)`
+ * use it for "no entries matched" and still produce their output (for example
+ * `IDC3012I ENTRY x NOT FOUND`). The SDK reports any non-zero rc as an error and carries the
+ * output in `additionalDetails` as JSON (`{"data": "<output>", ...}`).
+ *
+ * Returns the output text for an rc 4 error, or undefined for any other error (including other
+ * return codes and details that are not in the expected shape), so callers rethrow those.
+ */
+export function getTsoWarningOutput(err: unknown): string | undefined {
+  if (!(err instanceof Error) || !/\brc '4'/.test(err.message)) return undefined;
+  const details = getAdditionalDetails(err);
+  if (!details) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(details);
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      'data' in parsed &&
+      typeof parsed.data === 'string'
+    ) {
+      return parsed.data;
+    }
+  } catch {
+    // not JSON: treat as a real error
+  }
+  return undefined;
+}

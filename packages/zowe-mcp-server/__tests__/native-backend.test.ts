@@ -160,6 +160,7 @@ function createFakeClient(overrides?: {
     string: string;
     parms?: string;
   }) => Promise<{ data?: string }>;
+  tsoIssueCmd?: (req: { commandText: string }) => Promise<{ data?: string }>;
   ussListFiles?: (req: { fspath: string; long?: boolean }) => Promise<{
     items?: {
       name: string;
@@ -215,6 +216,10 @@ function createFakeClient(overrides?: {
 
   if (overrides?.toolSearch) {
     client.tool = { search: overrides.toolSearch };
+  }
+
+  if (overrides?.tsoIssueCmd) {
+    client.tso = { issueCmd: overrides.tsoIssueCmd };
   }
 
   if (overrides?.ussListFiles) {
@@ -596,6 +601,60 @@ describe('NativeBackend', () => {
       const backend = new NativeBackend(options);
 
       await expect(backend.listDatasets(SYSTEM_ID, 'USER.*')).rejects.toThrow('Some SDK error');
+    });
+  });
+
+  describe('runTsoCommand', () => {
+    /** Mirrors the SDK error for a TSO command that ends with the given return code. */
+    function tsoRcError(rc: number, data: string): Error {
+      return Object.assign(new Error(`Error running command, rc '${rc}'`), {
+        additionalDetails: JSON.stringify({ data, details: `  Details: ${data}` }),
+      });
+    }
+
+    it('returns the command output when the SDK reports rc 4 (e.g. LISTCAT found nothing)', async () => {
+      const output =
+        'IDC3012I ENTRY OMVSHOME. NOT FOUND+\nIDC3007I ** VSAM CATALOG RETURN-CODE IS 8\nIDC0014I LASTCC=4\n';
+      const backend = createBackendWithClient({
+        tsoIssueCmd: () => Promise.reject(tsoRcError(4, output)),
+      });
+
+      await expect(backend.runTsoCommand(SYSTEM_ID, 'LISTCAT LEVEL(OMVSHOME)')).resolves.toBe(
+        output
+      );
+    });
+
+    it('still throws for return codes other than 4', async () => {
+      const backend = createBackendWithClient({
+        tsoIssueCmd: () => Promise.reject(tsoRcError(8, 'INVALID USERID, RSHIH*\n')),
+      });
+
+      await expect(backend.runTsoCommand(SYSTEM_ID, 'LISTUSER RSHIH*')).rejects.toThrow(
+        /rc '8'[\s\S]*INVALID USERID/
+      );
+    });
+
+    it('still throws when an rc 4 error has no parseable command output', async () => {
+      const backend = createBackendWithClient({
+        tsoIssueCmd: () =>
+          Promise.reject(
+            Object.assign(new Error("Error running command, rc '4'"), {
+              additionalDetails: 'not json',
+            })
+          ),
+      });
+
+      await expect(backend.runTsoCommand(SYSTEM_ID, 'LISTCAT')).rejects.toThrow(/rc '4'/);
+    });
+
+    it('returns normal output unchanged', async () => {
+      const backend = createBackendWithClient({
+        tsoIssueCmd: () => Promise.resolve({ data: 'USER=GRIFFIN\n' }),
+      });
+
+      await expect(backend.runTsoCommand(SYSTEM_ID, 'LISTUSER GRIFFIN')).resolves.toBe(
+        'USER=GRIFFIN\n'
+      );
     });
   });
 
